@@ -1,0 +1,79 @@
+use std::{
+    collections::HashMap,
+    io::{stdin, stdout, Write},
+};
+
+use btc_heritage_wallet::{
+    btc_heritage::HeritageWalletBackup,
+    errors::{Error, Result},
+    heritage_service_api_client::Fingerprint,
+    BoundFingerprint, Database, DatabaseItem, Heir, HeirWallet, Wallet,
+};
+
+pub fn ask_user_confirmation(prompt: &str) -> Result<bool> {
+    print!("{prompt} Answer \"yes\" or \"no\" (default \"no\"): ");
+    stdout().flush().map_err(|e| {
+        log::error!("Could not display the confirmation prompt: {e}");
+        Error::generic(e)
+    })?;
+
+    let mut s = String::new();
+    stdin().read_line(&mut s).map_err(|e| {
+        log::error!("Not a correct string: {e}");
+        Error::generic(e)
+    })?;
+
+    // Remove the final \r\n, if present
+    if let Some('\n') = s.chars().next_back() {
+        s.pop();
+    }
+    if let Some('\r') = s.chars().next_back() {
+        s.pop();
+    }
+    Ok(s == "yes".to_owned())
+}
+
+pub fn prompt_user_for_password(double_check: bool) -> Result<String> {
+    let passphrase1 =
+        rpassword::prompt_password("Please enter your password: ").map_err(Error::generic)?;
+    if double_check {
+        let passphrase2 = rpassword::prompt_password("Please re-enter your password: ")
+            .map_err(Error::generic)?;
+        if passphrase1 != passphrase2 {
+            return Err(Error::Generic("Passwords did not match".to_owned()));
+        }
+    }
+    Ok(passphrase1)
+}
+
+pub fn get_fingerprints(db: &Database) -> Result<HashMap<Fingerprint, Vec<String>>> {
+    let mut map = HashMap::new();
+    for heir in Heir::all_in_db(&db)?.into_iter() {
+        if let Some(fingerprint) = heir.fingerprint().ok() {
+            map.entry(fingerprint)
+                .or_insert(vec![])
+                .push(format!("heir:{}", heir.name()))
+        }
+    }
+    for heir_wallet in HeirWallet::all_in_db(&db)?.into_iter() {
+        if let Some(fingerprint) = heir_wallet.fingerprint().ok() {
+            map.entry(fingerprint)
+                .or_insert(vec![])
+                .push(format!("heir-wallet:{}", heir_wallet.name()))
+        }
+    }
+    for wallet in Wallet::all_in_db(&db)?.into_iter() {
+        if let Some(fingerprint) = wallet.fingerprint().ok() {
+            map.entry(fingerprint)
+                .or_insert(vec![])
+                .push(format!("wallet:{}", wallet.name()))
+        }
+    }
+    Ok(map)
+}
+
+pub(crate) fn parse_heritage_wallet_backup(
+    val: &str,
+) -> core::result::Result<HeritageWalletBackup, serde_json::Error> {
+    serde_json::from_str(val)
+}
