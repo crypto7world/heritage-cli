@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, clap::Args)]
 pub struct BlockchainProviderGlobalArgs {
-    /// Set the Electrum server RPC endpoint URL to use when broadcasting a transaction or synchronizing a local wallet.
+    /// Set the Electrum server RPC endpoint URI to use when broadcasting a transaction or synchronizing a local wallet.
     #[arg(
         long,
         conflicts_with_all = ["auth_cookie", "username", "password"],
