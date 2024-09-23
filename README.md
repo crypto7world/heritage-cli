@@ -52,17 +52,19 @@
       <ul>
         <li><a href="#create-a-new-wallet">Create a new wallet</a></li>
         <li><a href="#restore-a-wallet-from-seed">Restore a wallet from seed</a></li>
+        <li><a href="#create-a-new-wallet-using-a-local-node-and-a-ledger">Create a new wallet using a local node and a Ledger</a></li>
         <li><a href="#extract-extended-public-keys">Extract eXtended public keys</a></li>
         <li><a href="#retrieve-heir-public-key">Retrieve heir public key</a></li>
+        <li><a href="#synchronize-the-wallet">Synchronize the wallet</a></li>
         <li><a href="#spending-coins">Spending coins</a></li>
       </ul>
     </li>
     <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#built-with">Built With</a></li>
     <li><a href="#minimum-supported-rust-version-msrv">Minimum Supported Rust Version (MSRV)</a></li>
     <li><a href="#license">License</a></li>
-    <li><a href="#contact">Contact</a></li>
+    <li><a href="#built-with">Built With</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
+    <li><a href="#contact">Contact</a></li>
   </ol>
 </details>
 
@@ -320,20 +322,6 @@ heritage-cli wallet broadcast $signed
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
-## Built With
-
-[![Rust][rust-shield]][rust-url]
-
-And based upon 3 Rust projects without which I would not have gotten that far:
-
-- [`bdk`]
-- [`rust-miniscript`]
-- [`rust-bitcoin`]
-
-Thanks.
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 <!-- MSRV -->
 
 ## Minimum Supported Rust Version (MSRV)
@@ -350,15 +338,19 @@ Distributed under the MIT License. See [`LICENSE`][license-url] for more informa
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
-<!-- CONTACT -->
+<!-- BUILT WITH -->
 
-## Contact
+## Built With
 
-John Galt - [@Crypto7W](https://twitter.com/Crypto7W) - <john@crypto7.world>
+[![Rust][rust-shield]][rust-url]
 
-Though my real name is Jérémie Rodon ([LinkedIn][jr-linkedin-url], [GitHub][jr-github-url]), I operate this project under the pseudonym John Galt in reference to the character of _Ayn Rand_ novel [**Atlas Shrugged**](https://www.amazon.com/Atlas-Shrugged-Ayn-Rand-ebook/dp/B003V8B5XO) (and, yes, I obviously embrace John Galt philosophy).
+And based upon 3 Rust projects without which I would not have gotten that far:
 
-Project Link: [https://github.com/crypto7world/heritage-cli][repo-url]
+- [`bdk`]
+- [`rust-miniscript`]
+- [`rust-bitcoin`]
+
+Thanks.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -371,6 +363,18 @@ Project Link: [https://github.com/crypto7world/heritage-cli][repo-url]
 - [`bdk`]
 - [Best Readme Template](https://github.com/othneildrew/Best-README-Template)
 - [Img Shields](https://shields.io)
+
+<p align="right">(<a href="#top">back to top</a>)</p>
+
+<!-- CONTACT -->
+
+## Contact
+
+John Galt - [@Crypto7W](https://twitter.com/Crypto7W) - <john@crypto7.world>
+
+Though my real name is Jérémie Rodon ([LinkedIn][jr-linkedin-url], [GitHub][jr-github-url]), I operate this project under the pseudonym John Galt in reference to the character of _Ayn Rand_ novel [**Atlas Shrugged**](https://www.amazon.com/Atlas-Shrugged-Ayn-Rand-ebook/dp/B003V8B5XO) (and, yes, I obviously embrace John Galt philosophy).
+
+Project Link: [https://github.com/crypto7world/heritage-cli][repo-url]
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
