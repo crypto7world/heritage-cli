@@ -72,7 +72,7 @@
 
 The [`heritage-cli`] project provides a CLI tool to manages Bitcoin wallets.
 
-It can interact with the [btcherit.com][heritage-wallet-service] service or manage everything locally (this is _Coming Soon_). On the private keys front, it can either manage them localy, or with the help of a [Ledger](https://www.ledger.com/) hardware-wallet device.
+It can interact with the [btcherit.com][heritage-wallet-service] service or manage everything locally. On the private keys front, it can either manage them localy, or with the help of a [Ledger](https://www.ledger.com/) hardware-wallet device.
 
 Here is the basic workflow between the **Bitcoin blockchain**, the [btcherit.com][heritage-wallet-service] service and the [`heritage-cli`]:
 
@@ -92,13 +92,15 @@ Another advantage of this setup is that you only have to verify/trust the [`heri
 
 ### Yeah, but I don't want to depend on an online service at all
 
-And I understand! Be patient, and take a look at the roadmap: before the year is over, the CLI will provide synchronization capabilities with a Bitcoin node that you own, making it possible to manage your Heritage wallet entirely on your own!
+And I understand: the CLI is able to work independently of the service! Provide it a custom Bitcoin Core or Electrum node for synchronization, and manage your Heritage wallet entirely on your own!
 
-### What is the added value of the service, once the CLI can fully operate on its own?
+Beware though that you _SHOULD_ make sure you understand what are the caveat of this mode of operation, most importantly that you _HAVE TO_ backup your descriptors: it is even more important than to backup you seed.
+
+### What is the added value of the service if the CLI can fully operate on its own?
 
 Using Taproot Bitcoin scripts to manage inheritance is only good as long as you don't forget to move your coins to "reset" the dead-man switch. The service is here to remind you of that, as well as making the operation easy or even seemless (for example, if you spend coins few months before the expiration of your deadman switch, the service will automatically use this transaction to "reset" it).
 
-On the other hand if you are dead, the service will notify and help your heirs to retrieve the coins you left behind.
+Also, if you are dead, your heirs should be notified and helped to retrieve the coins you left behind for them, the service is also handling this part.
 
 Of course you can take steps to do all that on your own, the service is simply here to ease the burden.
 
@@ -108,7 +110,7 @@ Of course you can take steps to do all that on your own, the service is simply h
 
 ## Stability and versioning
 
-All the software provided (libs and bins) is working and can be safely used for Bitcoin's holdings.
+The software provided is working and can be safely used for Bitcoin's holdings.
 
 We are using [Semantic Versioning](https://github.com/semver/semver) (MAJOR.MINOR.PATCH).
 
@@ -126,10 +128,10 @@ You can find precompiled binaries for the major platforms in the Release section
 
 [Latest version](https://github.com/crypto7world/heritage-cli/releases/latest) - [All releases](https://github.com/crypto7world/heritage-cli/releases)
 
-If you wish to install the `v0.3.0-alpha` for Linux, you can run:
+If you wish to install the `v0.3.0-beta` for Linux, you can run:
 
 ```shell
-version="v0.3.0-alpha"
+version="v0.3.0-beta"
 wget https://github.com/crypto7world/heritage-cli/releases/download/${version}/heritage-cli-${version}-x86_64-unknown-linux-gnu.tar.gz
 tar xvzf heritage-cli-${version}-x86_64-unknown-linux-gnu.tar.gz
 ./heritage-cli # to verify it worked, should display usage instructions
@@ -137,7 +139,7 @@ tar xvzf heritage-cli-${version}-x86_64-unknown-linux-gnu.tar.gz
 
 ### From source
 
-To install a dev version of `heritage-cli` from sources, make sure you have Rust installed. You can use any method, just make sure to have the Minimum Supported Rust Version. Using [rustup.rs](https://rustup.rs/) is generally a winner:
+To install the `heritage-cli` from sources, make sure you have Rust installed. You can use any method, just make sure to have the Minimum Supported Rust Version. Using [rustup.rs](https://rustup.rs/) is generally a winner:
 
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -153,13 +155,13 @@ Then clone this repo, `cd` into it and run cargo install:
 
 ```shell
 git clone https://github.com/crypto7world/heritage-cli
-cd btc-heritage
+cd heritage-cli
 cargo install --bin heritage-cli --path .
 export PATH="$PATH:$HOME/.cargo/bin" # Make sure cargo installation path is in your PATH
 heritage-cli # to verify it worked, should display usage instructions
 ```
 
-Alternatively you can just use `cargo build -r -p heritage-cli` and then copy the `heritage-cli` binary from the `target` directory to wherever you like.
+Alternatively you can just use `cargo build -r` and then copy the `heritage-cli` binary from the `target` directory to wherever you like.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -196,7 +198,7 @@ Options:
 
 ### Login to the service
 
-The CLI will want to communicate with the [btcherit.com][heritage-wallet-service] service and needs to be authenticated.
+Assuming you use the [btcherit.com][heritage-wallet-service] service as the online-wallet, the CLI will need to be authenticated.
 
 ```shell
 heritage-cli service login
@@ -204,14 +206,24 @@ heritage-cli service login
 
 It will open a web-browser tab so you can login to the service and grant access to the CLI.
 
-It is not a _mandatory_ step, but if you don't mind using the service, it will make your life **MUCH** easier.
+It is not per-say a _mandatory_ step, but it will make your life **MUCH** easier.
 
-### Create a new wallet using Ledger
+### Create a new wallet using the service and a Ledger
 
 Create a new wallet named _default_ that will use the [btcherit.com][heritage-wallet-service] service as `online-wallet` and a Ledger as `key-provider` by simply running:
 
 ```shell
 heritage-cli wallet create
+```
+
+Make sure your Ledger device in plugged in and unlocked!
+
+### Create a new wallet using a local node and a Ledger
+
+Create a new wallet named _default_ that will use a local bitcoin node as `online-wallet` and a Ledger as `key-provider` by running:
+
+```shell
+heritage-cli wallet create -o local
 ```
 
 Make sure your Ledger device in plugged in and unlocked!
@@ -258,6 +270,36 @@ heritage-cli heir wife backup-mnemonic
 
 The informations provided by these commands are all your heirs need to be able to spend your coins once you are not able to reset the deadman switch anymore. You can put those in sealed paper envelopes. It is safe, because as long as you don't loose your main access (and don't die), there is absolutely nothing anyone can do with these enveloppes.
 
+### Synchronize the wallet
+
+The Heritage wallet architecture makes it rely mostly on its internal database, which need to be synchronized with the blockchain when you receive new coins:
+
+```shell
+heritage-cli wallet sync
+```
+
+If you are _NOT USING_ the [btcherit.com][heritage-wallet-service] service, the CLI will attempt to connect to a local Bitcoin Core node by default. You can change this behavior, for example to use a local Electrum node:
+
+```shell
+heritage-cli blockchain --set --electrum-uri tcp://localhost:50001
+```
+
+See the Blockchain provider options for more:
+
+```text
+Blockchain Provider options:
+      --electrum-uri <ELECTRUM_URI>
+          Set the Electrum server RPC endpoint URI to use when broadcasting a transaction or synchronizing a local wallet
+      --bitcoincore-url <BITCOINCORE_URL>
+          Set the Bitcoin Core server RPC endpoint URL to use when broadcasting a transaction or synchronizing a local wallet
+      --auth-cookie <AUTH_COOKIE>
+          Use the specified cookie-file to authenticate with Bitcoin Core
+      --username <USERNAME>
+          Use the specified username to authenticate with Bitcoin Core
+      --password <PASSWORD>
+          Use the specified password to authenticate with Bitcoin Core
+```
+
 ### Spending coins
 
 You can spend coins like this, in one line:
@@ -266,9 +308,9 @@ You can spend coins like this, in one line:
 heritage-cli wallet send-bitcoin -r <address>:<amount> --sign --broadcast
 ```
 
-The CLI will retrieve a new transaction from the service, show it to you, ask you if you want to sign it and then broadcast it. And that's it.
+The CLI will create a new transaction, show it to you, ask you if you want to sign it and then broadcast it. And that's it.
 
-You can also decompose thoses steps. For reference, here is a script doing the same thing as our one line:
+You can also decompose thoses steps. For reference, here is a Bash script doing the same thing as the previous one-liner:
 
 ```shell
 unsigned=$(heritage-cli wallet send-bitcoin -r <address>:<amount>)
