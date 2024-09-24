@@ -11,19 +11,7 @@ use super::{gargs_blockchain_provider::BlockchainProviderConfig, CommandExecutor
 /// Top level cli sub-commands.
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum Command {
-    /// Commands to login in the service and manage wallets, heirs and heritages.
-    Service {
-        #[command(subcommand)]
-        subcmd: super::subcmd_service::ServiceSubcmd,
-    },
-    /// Show the default blockchain provider to use when synchronizing or broadcasting from a local wallet.
-    #[command(visible_aliases = ["blockchain", "default-blockchain", "blockchain-provider"])]
-    DefaultBlockchainProvider {
-        /// Set the default values using the current Blockchain Provider options instead of just displaying them
-        #[arg(long, default_value_t = false)]
-        set: bool,
-    },
-    /// Commands managing wallet, use this to create and manage Heritage wallets.
+    /// Commands managing wallets, use this to create and manage Heritage wallets.
     #[command(visible_aliases = ["wallets", "w"])]
     Wallet {
         /// The name of the wallet to operate.
@@ -33,7 +21,6 @@ pub enum Command {
         subcmd: ListAndDefault<super::subcmd_wallet::WalletSubcmd, Wallet>,
     },
     /// Commands managing heirs, use this to create or declare heirs for your Heritage wallet
-    /// {n}While very convenient, declaring heirs explicitly is not necessary.
     #[command(visible_aliases = ["heirs", "h"])]
     Heir {
         /// The name of the heir to operate.
@@ -53,8 +40,20 @@ pub enum Command {
         #[command(subcommand)]
         subcmd: ListAndDefault<super::subcmd_heirwallet::HeirWalletSubcmd, HeirWallet>,
     },
-
+    /// Commands related to the Heritage service, mainly used to authenticate the CLI with the service.
+    Service {
+        #[command(subcommand)]
+        subcmd: super::subcmd_service::ServiceSubcmd,
+    },
+    /// Show or set the default blockchain provider to use when synchronizing or broadcasting from a local wallet.
+    #[command(visible_aliases = ["blockchain", "default-blockchain", "default-blockchain-provider"])]
+    BlockchainProvider {
+        /// Set the default values using the current Blockchain Provider options instead of just displaying them
+        #[arg(long, default_value_t = false)]
+        set: bool,
+    },
     /// Display infos on the given Partially Signed Bitcoin Transaction (PSBT)
+    #[command(visible_alias = "display")]
     DisplayPsbt {
         /// The PSBT
         psbt: Psbt,
@@ -149,16 +148,6 @@ impl super::CommandExecutor for Command {
             Err(bcpc) => db.get_item(DEFAULT_BCPC_KEY)?.unwrap_or(bcpc),
         };
         match self {
-            Command::Service { subcmd } => {
-                let params = Box::new((db, service_gargs));
-                subcmd.execute(params)
-            }
-            Command::DefaultBlockchainProvider { set } => {
-                if set {
-                    db.update_item(DEFAULT_BCPC_KEY, &bcpc)?;
-                }
-                Ok(Box::new(bcpc))
-            }
             Command::Wallet {
                 wallet_name,
                 subcmd,
@@ -169,11 +158,6 @@ impl super::CommandExecutor for Command {
                 };
                 let params = Box::new((db, wallet_name, gargs, service_gargs, bcpc));
                 subcmd.execute(params)
-            }
-            Command::DisplayPsbt { psbt } => {
-                let network = gargs.network;
-                let summary = PsbtSummary::try_from((&psbt, &get_fingerprints(&db)?, network))?;
-                Ok(Box::new(summary))
             }
             Command::Heir { heir_name, subcmd } => {
                 let heir_name = match heir_name {
@@ -193,6 +177,21 @@ impl super::CommandExecutor for Command {
                 };
                 let params = Box::new((db, heir_wallet_name, gargs, service_gargs, bcpc));
                 subcmd.execute(params)
+            }
+            Command::Service { subcmd } => {
+                let params = Box::new((db, service_gargs));
+                subcmd.execute(params)
+            }
+            Command::BlockchainProvider { set } => {
+                if set {
+                    db.update_item(DEFAULT_BCPC_KEY, &bcpc)?;
+                }
+                Ok(Box::new(bcpc))
+            }
+            Command::DisplayPsbt { psbt } => {
+                let network = gargs.network;
+                let summary = PsbtSummary::try_from((&psbt, &get_fingerprints(&db)?, network))?;
+                Ok(Box::new(summary))
             }
         }
     }
