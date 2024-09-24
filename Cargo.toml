@@ -11,7 +11,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-btc-heritage-wallet = { git = "https://github.com/crypto7world/btc-heritage.git", tag = "v0.17.0"  }
+btc-heritage-wallet = { git = "https://github.com/crypto7world/btc-heritage.git", tag = "v0.18.0"  }
 clap = { version = "4.5", features = ["derive", "env"] }
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
@@ -20,6 +20,7 @@ env_logger = "0.11"
 rpassword = "7.3"
 dirs-next = "2.0"
 chrono = "0.4.38"
+open = "5.2.0"
 
 [dev-dependencies]
 tempfile = "3"

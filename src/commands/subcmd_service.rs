@@ -44,11 +44,33 @@ impl super::CommandExecutor for ServiceSubcmd {
             HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&db)?);
 
         let res: Box<dyn crate::display::Displayable> = match self {
-            ServiceSubcmd::Login => {
-                Tokens::new(&service_gargs.auth_url, &service_gargs.auth_client_id)?
-                    .save(&mut db)
-                    .map(|()| Box::new("Login successful"))?
-            }
+            ServiceSubcmd::Login => Tokens::new(
+                &service_gargs.auth_url,
+                &service_gargs.auth_client_id,
+                |device_auth_response| {
+                    let verification_uri_complete = format!(
+                        "{}?user_code={}",
+                        device_auth_response.verification_uri, device_auth_response.user_code
+                    );
+
+                    let human_formated_code = format!(
+                        "{}-{}",
+                        &device_auth_response.user_code[..4],
+                        &device_auth_response.user_code[4..]
+                    );
+
+                    println!("Go to {verification_uri_complete} to approve the connection");
+                    println!();
+                    println!("Verify that the code displayed is: {human_formated_code}");
+                    println!();
+
+                    _ = open::that(verification_uri_complete);
+
+                    Ok(())
+                },
+            )?
+            .save(&mut db)
+            .map(|()| Box::new("Login successful"))?,
             ServiceSubcmd::Logout => todo!(),
             ServiceSubcmd::ListWallets => service_client.list_wallets().map(Box::new)?,
             ServiceSubcmd::Wallet { wallet_id, subcmd } => {
