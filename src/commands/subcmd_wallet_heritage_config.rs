@@ -4,7 +4,7 @@ use std::{collections::HashMap, rc::Rc};
 use btc_heritage_wallet::{
     btc_heritage::{
         heritage_config::v1::{Days, Heritage},
-        AccountXPub, HeirConfig, HeritageConfig, HeritageConfigVersion, SingleHeirPubkey,
+        AccountXPub, HeirConfig, HeritageConfig, HeritageConfigVersion,
     },
     errors::{Error, Result},
     AnyOnlineWallet, Database, DatabaseItem, Heir, OnlineWallet, Wallet,
@@ -224,9 +224,9 @@ fn parse_heir_config(val: &str) -> core::result::Result<(HeirConfig, Days), Stri
             "xpub" => HeirConfig::HeirXPubkey(
                 AccountXPub::try_from(splits[1]).map_err(|e| e.to_string())?,
             ),
-            "single-pub" => HeirConfig::SingleHeirPubkey(
-                SingleHeirPubkey::try_from(splits[1]).map_err(|e| e.to_string())?,
-            ),
+            // "single-pub" => HeirConfig::SingleHeirPubkey(
+            //     SingleHeirPubkey::try_from(splits[1]).map_err(|e| e.to_string())?,
+            // ),
             _ => return Err(format!("Invalid KIND: {}", splits[0])),
         },
         _ => return Err(format!("Invalid number of parts: {}", splits.len())),

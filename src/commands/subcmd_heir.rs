@@ -1,7 +1,7 @@
 use core::{any::Any, cell::RefCell};
 
 use btc_heritage_wallet::{
-    btc_heritage::{AccountXPub, HeirConfig, SingleHeirPubkey},
+    btc_heritage::{AccountXPub, HeirConfig},
     errors::{Error, Result},
     heritage_service_api_client::{
         EmailAddress, HeirContact, HeirCreate, HeirPermission, HeirPermissions,
@@ -95,15 +95,15 @@ pub enum HeirSubcmd {
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum HeirConfigType {
-    /// Produce an Heir Config consisting of a single PublicKey (deprecated)
-    SinglePub,
+    // /// Produce an Heir Config consisting of a single PublicKey (deprecated)
+    // SinglePub,
     /// Produce an Heir Config consisting of an Extended PublicKey
     Xpub,
 }
 impl From<HeirConfigType> for btc_heritage_wallet::HeirConfigType {
     fn from(value: HeirConfigType) -> Self {
         match value {
-            HeirConfigType::SinglePub => btc_heritage_wallet::HeirConfigType::SingleHeirPubkey,
+            // HeirConfigType::SinglePub => btc_heritage_wallet::HeirConfigType::SingleHeirPubkey,
             HeirConfigType::Xpub => btc_heritage_wallet::HeirConfigType::HeirXPubkey,
         }
     }
@@ -171,9 +171,9 @@ impl super::CommandExecutor for HeirSubcmd {
                 };
                 let heir_config = if let Some(heir_config) = heir_config {
                     match kind {
-                        HeirConfigType::SinglePub => HeirConfig::SingleHeirPubkey(
-                            SingleHeirPubkey::try_from(heir_config.as_str())?,
-                        ),
+                        // HeirConfigType::SinglePub => HeirConfig::SingleHeirPubkey(
+                        //     SingleHeirPubkey::try_from(heir_config.as_str())?,
+                        // ),
                         HeirConfigType::Xpub => {
                             HeirConfig::HeirXPubkey(AccountXPub::try_from(heir_config.as_str())?)
                         }
