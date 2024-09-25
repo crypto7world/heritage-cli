@@ -231,10 +231,10 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                     }
                     KeyProviderType::Ledger => todo!(),
                 };
-                let fingerprint = if let Some(fingerprint) = fingerprint {
-                    *fingerprint
-                } else if !key_provider.is_none() {
+                let fingerprint = if !key_provider.is_none() {
                     key_provider.fingerprint()?
+                } else if let Some(fingerprint) = fingerprint {
+                    *fingerprint
                 } else {
                     unreachable!("clap ensures it")
                 };
