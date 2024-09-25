@@ -8,7 +8,7 @@ use btc_heritage_wallet::{
     heritage_provider::{LocalWallet, ServiceBinding},
     heritage_service_api_client::{Fingerprint, HeritageServiceClient, Tokens},
     AnyHeritageProvider, AnyKeyProvider, BoundFingerprint, Database, DatabaseItem, HeirWallet,
-    HeritageProvider, KeyProvider, Language, LocalKey, Mnemonic, OnlineWallet,
+    Heritage, HeritageProvider, KeyProvider, Language, LocalKey, Mnemonic, OnlineWallet,
 };
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 
@@ -21,6 +21,33 @@ use crate::{
 use super::{
     gargs_blockchain_provider::BlockchainProviderConfigWithNetwork, subcmd_wallet::KeyProviderType,
 };
+
+#[derive(Debug, serde::Serialize)]
+pub struct Inheritance {
+    inheritance_id: String,
+    #[serde(with = "btc_heritage_wallet::btc_heritage::amount_serde")]
+    value: btc_heritage_wallet::bitcoin::Amount,
+    /// The timestamp after which the Heir is able to spend
+    maturity: u64,
+    /// The maturity of the next heir, if any
+    next_heir_maturity: Option<u64>,
+}
+impl From<Heritage> for Inheritance {
+    fn from(value: Heritage) -> Self {
+        let Heritage {
+            heritage_id,
+            value,
+            maturity,
+            next_heir_maturity,
+        } = value;
+        Inheritance {
+            inheritance_id: heritage_id,
+            value,
+            maturity,
+            next_heir_maturity,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum HeritageProviderType {
@@ -100,13 +127,14 @@ pub enum HeirWalletSubcmd {
     },
     /// Sync the local heritage-provider from the Bitcoin network
     Sync,
-    /// Display all currently spendable Heritages and their IDs
-    ListHeritages,
+    /// Display all currently spendable inheritances and their IDs
+    #[command(visible_aliases = ["list-inheritance", "list-heritages", "list-heritage", "li"])]
+    ListInheritances,
     /// Create a Partially Signed Bitcoin Transaction (PSBT), a.k.a an Unsigned TX, from the provided information
-    #[command(visible_aliases = ["send-heritage", "send", "spend", "sh"])]
-    SpendHeritage {
-        /// The Heritage ID to spend
-        #[arg(short, long, value_name = "HERITAGE_ID", required = true)]
+    #[command(visible_aliases = ["send-inheritance", "send-heritage", "spend-heritage", "send", "spend", "si"])]
+    SpendInheritance {
+        /// The inheritance ID to spend
+        #[arg(short, long, value_name = "INHERITANCE_ID", required = true)]
         id: String,
         /// A recipient address to which send all Heritages with the ID (see the `list-heritages` command).
         #[arg(short, long, value_name = "ADDRESS", required = true)]
@@ -161,8 +189,8 @@ impl super::CommandExecutor for HeirWalletSubcmd {
         let need_heritage_provider = match &self {
             HeirWalletSubcmd::Create { .. }
             | HeirWalletSubcmd::Sync
-            | HeirWalletSubcmd::ListHeritages
-            | HeirWalletSubcmd::SpendHeritage { .. }
+            | HeirWalletSubcmd::ListInheritances
+            | HeirWalletSubcmd::SpendInheritance { .. }
             | HeirWalletSubcmd::BroadcastPsbt { .. } => true,
             HeirWalletSubcmd::SignPsbt { broadcast, .. } if *broadcast => true,
             HeirWalletSubcmd::Rename { .. }
@@ -177,17 +205,17 @@ impl super::CommandExecutor for HeirWalletSubcmd {
             | HeirWalletSubcmd::SignPsbt { .. }
             | HeirWalletSubcmd::HeirConfig { .. }
             | HeirWalletSubcmd::BackupMnemonic { .. } => true,
-            HeirWalletSubcmd::SpendHeritage { sign, .. } if *sign => true,
+            HeirWalletSubcmd::SpendInheritance { sign, .. } if *sign => true,
             HeirWalletSubcmd::Rename { .. }
             | HeirWalletSubcmd::Sync
-            | HeirWalletSubcmd::SpendHeritage { .. }
+            | HeirWalletSubcmd::SpendInheritance { .. }
             | HeirWalletSubcmd::Remove { .. }
             | HeirWalletSubcmd::Fingerprint
-            | HeirWalletSubcmd::ListHeritages
+            | HeirWalletSubcmd::ListInheritances
             | HeirWalletSubcmd::BroadcastPsbt { .. } => false,
         };
         let need_blockchain_provider = match &self {
-            HeirWalletSubcmd::SpendHeritage { broadcast, .. } if *broadcast => true,
+            HeirWalletSubcmd::SpendInheritance { broadcast, .. } if *broadcast => true,
             HeirWalletSubcmd::SignPsbt { broadcast, .. } if *broadcast => true,
             HeirWalletSubcmd::BroadcastPsbt { .. } | HeirWalletSubcmd::Sync => true,
             _ => false,
@@ -357,8 +385,14 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                 local_wallet.local_heritage_wallet_mut().sync()?;
                 Box::new("Synchronization done")
             }
-            HeirWalletSubcmd::ListHeritages => Box::new(heir.borrow().list_heritages()?),
-            HeirWalletSubcmd::SpendHeritage {
+            HeirWalletSubcmd::ListInheritances => Box::new(
+                heir.borrow()
+                    .list_heritages()?
+                    .into_iter()
+                    .map(Inheritance::from)
+                    .collect::<Vec<_>>(),
+            ),
+            HeirWalletSubcmd::SpendInheritance {
                 id,
                 recipient,
                 sign,
