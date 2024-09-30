@@ -302,10 +302,9 @@ impl super::CommandExecutor for WalletSubcmd {
             | WalletSubcmd::BackupMnemonic { .. }
             | WalletSubcmd::HeirConfig { .. } => true,
             WalletSubcmd::LedgerPolicies { subcmd } => match subcmd {
-                WalletLedgerPolicySubcmd::ListRegistered
-                | WalletLedgerPolicySubcmd::AutoRegister
+                WalletLedgerPolicySubcmd::AutoRegister
                 | WalletLedgerPolicySubcmd::Register { .. } => true,
-                WalletLedgerPolicySubcmd::List => false,
+                WalletLedgerPolicySubcmd::ListRegistered | WalletLedgerPolicySubcmd::List => false,
             },
             WalletSubcmd::AccountXpubs { subcmd } => match subcmd {
                 WalletAXpubSubcmd::Generate { .. } | WalletAXpubSubcmd::AutoAdd { .. } => true,
