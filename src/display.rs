@@ -19,7 +19,7 @@ impl Displayable for () {
     fn display(&self) {}
 }
 
-macro_rules! displayable {
+macro_rules! str_display {
     (Vec<$name:ty>) => {
         impl Displayable for Vec<$name> {
             fn display(&self) {
@@ -38,16 +38,16 @@ macro_rules! displayable {
     };
 }
 
-displayable!(&str);
-displayable!(String);
-displayable!(Fingerprint);
-displayable!(Vec<String>);
-displayable!(Vec<AccountXPub>);
-displayable!(Vec<WalletAddress>);
+str_display!(&str);
+str_display!(String);
+str_display!(Fingerprint);
+str_display!(Vec<String>);
+str_display!(Vec<AccountXPub>);
+str_display!(Vec<WalletAddress>);
 
-pub trait AutoDisplayable {}
+pub trait SerdeDisplay: serde::Serialize {}
 
-impl<T: serde::Serialize + AutoDisplayable> Displayable for T {
+impl<T: SerdeDisplay> Displayable for T {
     fn display(&self) {
         println!(
             "{}",
@@ -56,21 +56,31 @@ impl<T: serde::Serialize + AutoDisplayable> Displayable for T {
         )
     }
 }
+impl<T: SerdeDisplay> SerdeDisplay for Vec<T> {}
 
-impl AutoDisplayable for HeirConfig {}
-impl AutoDisplayable for MnemonicBackup {}
-impl AutoDisplayable for Heir {}
-impl AutoDisplayable for HeritageWalletMeta {}
-impl AutoDisplayable for Heritage {}
-impl AutoDisplayable for HeritageConfig {}
-impl AutoDisplayable for AccountXPubWithStatus {}
-impl AutoDisplayable for LedgerPolicy {}
-impl AutoDisplayable for WalletStatus {}
-impl AutoDisplayable for TransactionSummary {}
-impl AutoDisplayable for BlockInclusionObjective {}
-impl AutoDisplayable for HeritageWalletBackup {}
-impl AutoDisplayable for PsbtSummary {}
-impl<A, B, C, D> AutoDisplayable for (A, B, C, D)
+macro_rules! serde_display {
+    ($name:ty) => {
+        impl SerdeDisplay for $name {}
+    };
+}
+
+serde_display!(HeirConfig);
+serde_display!(MnemonicBackup);
+serde_display!(Heir);
+serde_display!(HeritageWalletMeta);
+serde_display!(Heritage);
+serde_display!(HeritageConfig);
+serde_display!(AccountXPubWithStatus);
+serde_display!(WalletStatus);
+serde_display!(TransactionSummary);
+serde_display!(BlockInclusionObjective);
+serde_display!(HeritageWalletBackup);
+serde_display!(PsbtSummary);
+
+// TODO: Display it like the Ledger device is displaying it
+serde_display!(LedgerPolicy);
+
+impl<A, B, C, D> SerdeDisplay for (A, B, C, D)
 where
     A: serde::Serialize,
     B: serde::Serialize,
@@ -78,4 +88,3 @@ where
     D: serde::Serialize,
 {
 }
-impl<T: AutoDisplayable> AutoDisplayable for Vec<T> {}

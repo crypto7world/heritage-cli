@@ -10,7 +10,7 @@ use btc_heritage_wallet::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::display::AutoDisplayable;
+use crate::display::SerdeDisplay;
 
 #[derive(Clone, Debug, clap::Args)]
 pub struct BlockchainProviderGlobalArgs {
@@ -70,7 +70,7 @@ pub enum BlockchainProviderConfig {
     Electrum { url: String },
 }
 
-impl AutoDisplayable for BlockchainProviderConfig {}
+impl SerdeDisplay for BlockchainProviderConfig {}
 
 impl Default for BlockchainProviderConfig {
     fn default() -> Self {
