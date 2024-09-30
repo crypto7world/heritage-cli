@@ -41,12 +41,13 @@ pub enum Command {
         subcmd: ListAndDefault<super::subcmd_heirwallet::HeirWalletSubcmd, HeirWallet>,
     },
     /// Commands related to the Heritage service, mainly used to authenticate the CLI with the service.
+    #[command(visible_aliases = ["svc"])]
     Service {
         #[command(subcommand)]
         subcmd: super::subcmd_service::ServiceSubcmd,
     },
     /// Show or set the default blockchain provider to use when synchronizing or broadcasting from a local wallet.
-    #[command(visible_aliases = ["blockchain", "default-blockchain", "default-blockchain-provider"])]
+    #[command(visible_aliases = ["bp", "blockchain"], aliases = ["default-blockchain", "default-blockchain-provider"])]
     BlockchainProvider {
         /// Set the default values using the current Blockchain Provider options instead of just displaying them
         #[arg(long, default_value_t = false)]
