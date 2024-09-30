@@ -50,7 +50,8 @@ pub struct ServiceGlobalArgs {
         value_hint = clap::ValueHint::Url,
         env="HERITAGE_SERVICE_API_URL",
         default_value = "https://api.btcherit.com/v1",
-        global = true
+        global = true,
+        hide = true,
     )]
     pub service_api_url: String,
     /// Set the URL of the Heritage service OAUTH token endpoint for the CLI.
@@ -59,7 +60,8 @@ pub struct ServiceGlobalArgs {
         value_hint = clap::ValueHint::Url,
         env="HERITAGE_AUTH_URL",
         default_value = "https://device.crypto7.world/token",
-        global = true
+        global = true,
+        hide = true,
     )]
     pub auth_url: String,
     /// Set the OAUTH Client Id of the CLI for the Heritage service authentication endpoint.
@@ -67,7 +69,8 @@ pub struct ServiceGlobalArgs {
         long,
         env = "HERITAGE_AUTH_CLIENT_ID",
         default_value = "cda6031ca00d09d66c2b632448eb8fef",
-        global = true
+        global = true,
+        hide = true
     )]
     pub auth_client_id: String,
 }
@@ -82,12 +85,11 @@ pub struct CliParser {
     #[clap(next_help_heading = Some("Global options"))]
     #[command(flatten)]
     pub gargs: CliGlobalArgs,
-    #[clap(next_help_heading = Some("Service options"))]
-    #[command(flatten)]
-    pub service_gargs: ServiceGlobalArgs,
     #[clap(next_help_heading = Some("Blockchain Provider options"))]
     #[command(flatten)]
     pub blockchain_provider_gargs: gargs_blockchain_provider::BlockchainProviderGlobalArgs,
+    #[command(flatten)]
+    pub service_gargs: ServiceGlobalArgs,
     #[command(subcommand)]
     /// Top level cli sub-commands.
     pub cmd: commands::Command,
