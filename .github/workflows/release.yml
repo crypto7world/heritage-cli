@@ -158,7 +158,7 @@ jobs:
           | <img src="https://simpleicons.org/icons/linux.svg" style="width: 32px;"/> | x86_64 | [heritage-cli-${{ env.VERSION }}-x86_64-linux-gnu.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/heritage-cli-${{ env.VERSION }}-x86_64-linux-gnu.tar.gz) |
           | <img src="https://simpleicons.org/icons/apple.svg" style="width: 32px;"/> | x86_64 | [heritage-cli-${{ env.VERSION }}-x86_64-apple-darwin.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/heritage-cli-${{ env.VERSION }}-x86_64-apple-darwin.tar.gz) |
           | <img src="https://simpleicons.org/icons/apple.svg" style="width: 32px;"/> | aarch64 | [heritage-cli-${{ env.VERSION }}-aarch64-apple-darwin.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/heritage-cli-${{ env.VERSION }}-aarch64-apple-darwin.tar.gz) |
-          | Windows | x86_64 | [heritage-cli-${{ env.VERSION }}-x86_64-windows-msvc.zip](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/heritage-cli-${{ env.VERSION }}-x86_64-windows.zip) |
+          | Windows | x86_64 | [heritage-cli-${{ env.VERSION }}-x86_64-windows.zip](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/heritage-cli-${{ env.VERSION }}-x86_64-windows.zip) |
           ENDBODY
           )
           assets=(./heritage-cli-*.tar.gz/heritage-cli-*.tar.gz)
