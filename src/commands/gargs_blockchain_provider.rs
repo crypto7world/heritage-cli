@@ -10,6 +10,8 @@ use btc_heritage_wallet::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::display::AutoDisplayable;
+
 #[derive(Clone, Debug, clap::Args)]
 pub struct BlockchainProviderGlobalArgs {
     /// Set the Electrum server RPC endpoint URI to use when broadcasting a transaction or synchronizing a local wallet.
@@ -67,6 +69,8 @@ pub enum BlockchainProviderConfig {
     BitcoinCore { url: String, auth: Auth },
     Electrum { url: String },
 }
+
+impl AutoDisplayable for BlockchainProviderConfig {}
 
 impl Default for BlockchainProviderConfig {
     fn default() -> Self {

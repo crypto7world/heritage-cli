@@ -32,6 +32,7 @@ pub struct Inheritance {
     /// The maturity of the next heir, if any
     next_heir_maturity: Option<u64>,
 }
+impl crate::display::AutoDisplayable for Inheritance {}
 impl From<Heritage> for Inheritance {
     fn from(value: Heritage) -> Self {
         let Heritage {
