@@ -70,7 +70,12 @@ impl super::CommandExecutor for WalletHeritageConfigSubcmd {
         let res: Box<dyn crate::display::Displayable> = match self {
             WalletHeritageConfigSubcmd::List => Box::new(wallet.borrow().list_heritage_configs()?),
             WalletHeritageConfigSubcmd::ShowCurrent => {
-                Box::new(wallet.borrow().list_heritage_configs()?.remove(0))
+                let mut hc_list = wallet.borrow().list_heritage_configs()?;
+                if hc_list.len() > 0 {
+                    Box::new(hc_list.remove(0))
+                } else {
+                    Box::new(())
+                }
             }
             WalletHeritageConfigSubcmd::Set { manual_spec, json } => {
                 let hc = if let Some(manual_spec) = manual_spec {
