@@ -7,6 +7,7 @@ use btc_heritage_wallet::{
         AccountXPubWithStatus, Fingerprint, Heir, Heritage, HeritageWalletMeta, TransactionSummary,
     },
     key_provider::MnemonicBackup,
+    ledger::WalletPolicy,
     online_wallet::WalletStatus,
     LedgerPolicy, PsbtSummary,
 };
@@ -76,8 +77,6 @@ serde_display!(TransactionSummary);
 serde_display!(BlockInclusionObjective);
 serde_display!(HeritageWalletBackup);
 serde_display!(PsbtSummary);
-
-// TODO: Display it like the Ledger device is displaying it
 serde_display!(LedgerPolicy);
 
 impl<A, B, C, D> SerdeDisplay for (A, B, C, D)
@@ -87,4 +86,17 @@ where
     C: serde::Serialize,
     D: serde::Serialize,
 {
+}
+
+impl Displayable for WalletPolicy {
+    fn display(&self) {
+        println!(" \x1b[1mAccount name\x1b[0m: {}", self.name);
+        println!("\x1b[1mWallet policy\x1b[0m: {}", self.descriptor_template);
+        for (i, key) in self.keys.iter().enumerate() {
+            // There will never be more than 100keys in a template
+            let i_len = if i < 10 { 1usize } else { 2usize };
+            let left_pad_len = 8 - i_len;
+            println!("{:>left_pad_len$}\x1b[1mKey @{i}\x1b[0m: {}", "", key);
+        }
+    }
 }

@@ -188,8 +188,7 @@ impl super::CommandExecutor for WalletHeritageConfigSubcmd {
                 } else {
                     unreachable!("either manual_spec or json must be present")
                 };
-                let new_hc = wallet.borrow_mut().set_heritage_config(hc)?;
-                Box::new(new_hc)
+                Box::new(wallet.borrow_mut().set_heritage_config(hc)?)
             }
         };
         Ok(res)

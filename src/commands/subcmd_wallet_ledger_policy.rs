@@ -2,8 +2,11 @@ use core::{any::Any, cell::RefCell};
 use std::{collections::HashSet, rc::Rc};
 
 use btc_heritage_wallet::{
-    errors::Result, Database, DatabaseItem, LedgerPolicy, OnlineWallet, Wallet,
+    errors::Result, ledger::WalletPolicy, Database, DatabaseItem, LedgerPolicy, OnlineWallet,
+    Wallet,
 };
+
+use crate::display::Displayable;
 
 /// Wallet Ledger Policy management subcommand.
 #[derive(Debug, Clone, clap::Subcommand)]
@@ -15,7 +18,7 @@ pub enum WalletLedgerPolicySubcmd {
     /// Register policies on a Ledger device
     Register {
         /// The policies to register.
-        #[arg(value_name = "POLICY", num_args=1.., value_parser=parse_descriptor_backup)]
+        #[arg(value_name = "POLICY", num_args=1.., value_parser=parse_ledger_policies)]
         policies: Vec<LedgerPolicy>,
     },
     /// Retrieve Ledger policies using the Online component of the wallet and register them to the Offline component
@@ -51,7 +54,7 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                 let count = if let btc_heritage_wallet::AnyKeyProvider::Ledger(ledger_wallet) =
                     wallet.borrow_mut().key_provider_mut()
                 {
-                    ledger_wallet.register_policies(&policies)?
+                    ledger_wallet.register_policies(&policies, display_wallet_policy)?
                 } else {
                     return Err(btc_heritage_wallet::errors::Error::IncorrectKeyProvider(
                         "Ledger",
@@ -96,7 +99,7 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                 let count = if let btc_heritage_wallet::AnyKeyProvider::Ledger(ledger_wallet) =
                     wallet.borrow_mut().key_provider_mut()
                 {
-                    ledger_wallet.register_policies(&policies)?
+                    ledger_wallet.register_policies(&policies, display_wallet_policy)?
                 } else {
                     unreachable!("already confirmed it is a Ledger")
                 };
@@ -108,6 +111,12 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
     }
 }
 
-fn parse_descriptor_backup(val: &str) -> Result<LedgerPolicy> {
+fn display_wallet_policy(wallet_policy: &WalletPolicy) {
+    println!("\x1b[4mRegister account\x1b[0m");
+    wallet_policy.display();
+    println!();
+}
+
+fn parse_ledger_policies(val: &str) -> Result<LedgerPolicy> {
     Ok(val.try_into()?)
 }

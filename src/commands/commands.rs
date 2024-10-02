@@ -29,7 +29,6 @@ pub enum Command {
         #[command(subcommand)]
         subcmd: ListAndDefault<super::subcmd_heir::HeirSubcmd, Heir>,
     },
-
     /// Commands managing heir-wallets, restricted wallets used only to list and claim inheritances
     /// {n}Use this if you are an heir and just want to claim an inheritance.
     #[command(visible_aliases = ["heir-wallets", "hw"])]
