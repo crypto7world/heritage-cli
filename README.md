@@ -139,6 +139,8 @@ tar xvzf heritage-cli-${version}-x86_64-unknown-linux-gnu.tar.gz
 ./heritage-cli # to verify it worked, should display usage instructions
 ```
 
+_**Note:** If you are on Linux and plan on using a Ledger device, you need to install UDEV rules, go to the official Ledger repository: [https://github.com/LedgerHQ/udev-rules](https://github.com/LedgerHQ/udev-rules)_
+
 ### From source
 
 To install the `heritage-cli` from sources, make sure you have Rust installed. You can use any method, just make sure to have the Minimum Supported Rust Version. Using [rustup.rs](https://rustup.rs/) is generally a winner:
@@ -212,6 +214,8 @@ It is not per-say a _mandatory_ step, but it will make your life **MUCH** easier
 
 ### Create a new wallet using the service and a Ledger
 
+_**Note:** If you are on Linux, you need to install UDEV rules in order for your Ledger device to be found, go to the official Ledger repository: [https://github.com/LedgerHQ/udev-rules](https://github.com/LedgerHQ/udev-rules)_
+
 Create a new wallet named _default_ that will use the [btcherit.com][heritage-wallet-service] service as `online-wallet` and a Ledger as `key-provider` by simply running:
 
 ```shell
@@ -221,6 +225,8 @@ heritage-cli wallet create
 Make sure your Ledger device in plugged in and unlocked!
 
 ### Create a new wallet using a local node and a Ledger
+
+_**Note:** If you are on Linux, you need to install UDEV rules in order for your Ledger device to be found, go to the official Ledger repository: [https://github.com/LedgerHQ/udev-rules](https://github.com/LedgerHQ/udev-rules)_
 
 Create a new wallet named _default_ that will use a local bitcoin node as `online-wallet` and a Ledger as `key-provider` by running:
 
