@@ -1,6 +1,6 @@
 [package]
 name = "heritage-cli"
-version = "0.4.1-beta"
+version = "0.5.0-beta"
 description = "The Heritage wallet CLI, a Bitcoin Taproot wallet managing on-chain inheritance of bitcoins"
 repository = "https://github.com/crypto7world/heritage-cli.git"
 rust-version = "1.79"
