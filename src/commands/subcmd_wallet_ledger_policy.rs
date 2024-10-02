@@ -48,15 +48,15 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                 Box::new(ledger_wallet.list_registered_policies())
             }
             WalletLedgerPolicySubcmd::Register { policies } => {
-                let mut wallet_ref_mut = wallet.borrow_mut();
-                let btc_heritage_wallet::AnyKeyProvider::Ledger(ledger_wallet) =
-                    wallet_ref_mut.key_provider_mut()
-                else {
+                let count = if let btc_heritage_wallet::AnyKeyProvider::Ledger(ledger_wallet) =
+                    wallet.borrow_mut().key_provider_mut()
+                {
+                    ledger_wallet.register_policies(&policies)?
+                } else {
                     return Err(btc_heritage_wallet::errors::Error::IncorrectKeyProvider(
                         "Ledger",
                     ));
                 };
-                let count = ledger_wallet.register_policies(&policies)?;
                 wallet.borrow().save(&mut db)?;
                 Box::new(format!("{count} policies registered"))
             }
