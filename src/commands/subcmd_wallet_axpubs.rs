@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use btc_heritage_wallet::{
     btc_heritage::AccountXPub, errors::Result, heritage_service_api_client::AccountXPubWithStatus,
-    KeyProvider, Wallet, OnlineWallet,
+    KeyProvider, OnlineWallet, Wallet,
 };
 
 /// Wallet Account XPubs management subcommand.
@@ -80,15 +80,15 @@ impl super::CommandExecutor for WalletAXpubSubcmd {
                 let (unused_count, last_seen_index) =
                     axpubs
                         .iter()
-                        .fold((0usize, 0), |(uc, lsi), axpub| match axpub {
+                        .fold((0usize, None), |(uc, lsi), axpub| match axpub {
                             AccountXPubWithStatus::Used(axpub) => {
-                                (uc, core::cmp::max(lsi, axpub.descriptor_id()))
+                                (uc, core::cmp::max(lsi, Some(axpub.descriptor_id())))
                             }
                             AccountXPubWithStatus::Unused(axpub) => {
-                                (uc + 1, core::cmp::max(lsi, axpub.descriptor_id()))
+                                (uc + 1, core::cmp::max(lsi, Some(axpub.descriptor_id())))
                             }
                         });
-                let start = last_seen_index + 1;
+                let start = last_seen_index.map(|lsi| lsi + 1).unwrap_or(0);
                 let end = start + (count.checked_sub(unused_count).unwrap_or(0)) as u32;
                 let account_xpubs = wallet.borrow().derive_accounts_xpubs(start..end)?;
                 wallet.borrow_mut().feed_account_xpubs(account_xpubs)?;
