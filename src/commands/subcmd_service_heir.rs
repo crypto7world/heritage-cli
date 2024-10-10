@@ -27,7 +27,9 @@ pub enum HeirSubcmd {
         /// Remove the custom message if present
         #[arg(long, default_value_t = false, conflicts_with = "custom_message")]
         remove_custom_message: bool,
-        /// Change the permissions of the heir
+        /// Change the permissions of the heir.
+        ///
+        /// Note that when their inheritance reach maturity, an heir will have at least the permissions ["is-heir", "amount", "maturity"]
         #[arg(long, value_enum)]
         permissions: Option<Vec<CliHeirPermission>>,
     },
@@ -119,7 +121,7 @@ impl super::CommandExecutor for HeirSubcmd {
 }
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum CliHeirPermission {
-    /// The Heir can see informations before maturity
+    /// The Heir can see their inheritance
     IsHeir,
     /// The Heir can see your email address
     OwnerEmail,
@@ -129,6 +131,10 @@ pub enum CliHeirPermission {
     Maturity,
     /// The heir can see their position in the HeritageConfigs and the total number of heirs
     Position,
+    /// [Only AFTER maturity] The heir can see the full Bitcoin Descriptors of the Heritage Configurations.
+    /// {n}Mandatory if the Heir's wallet is a Ledger, as it will request the full descriptor before spending.
+    /// {n}Note that it means the heir will be able to infer the public keys of other heirs and their own position.
+    FullDescriptor,
 }
 impl From<CliHeirPermission> for HeirPermission {
     fn from(value: CliHeirPermission) -> Self {
@@ -138,6 +144,7 @@ impl From<CliHeirPermission> for HeirPermission {
             CliHeirPermission::Amount => HeirPermission::Amount,
             CliHeirPermission::Maturity => HeirPermission::Maturity,
             CliHeirPermission::Position => HeirPermission::Position,
+            CliHeirPermission::FullDescriptor => HeirPermission::FullDescriptor,
         }
     }
 }
