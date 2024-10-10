@@ -166,9 +166,10 @@ pub enum WalletSubcmd {
     },
     /// Display the fingerprint of the wallet
     Fingerprint,
-    /// Display the mnemonic of the wallet for backup purpose
-    /// {n}/!\ BE AWARE THAT THOSE INFORMATIONS WILL ALLOW SPENDING OF YOUR COINS unless the wallet is passphrase-protected /!\
-    BackupMnemonic {
+    /// Display the mnemonic of the wallet for backup purposes
+    /// {n}/!\ BE AWARE THAT THOSE INFORMATION WILL ALLOW SPENDING OF YOUR COINS unless the wallet is passphrase-protected /!\
+    #[command(visible_alias = "backup-mnemonic")]
+    Mnemonic {
         #[arg(long, required = true)]
         /// Confirm that you know what you are doing
         i_understand_what_i_am_doing: bool,
@@ -293,13 +294,13 @@ impl super::CommandExecutor for WalletSubcmd {
             | WalletSubcmd::SignPsbt { .. }
             | WalletSubcmd::Rename { .. }
             | WalletSubcmd::Fingerprint
-            | WalletSubcmd::BackupMnemonic { .. }
+            | WalletSubcmd::Mnemonic { .. }
             | WalletSubcmd::HeirConfig { .. } => false,
         };
         let need_key_provider = match &self {
             WalletSubcmd::Create { .. }
             | WalletSubcmd::SignPsbt { .. }
-            | WalletSubcmd::BackupMnemonic { .. }
+            | WalletSubcmd::Mnemonic { .. }
             | WalletSubcmd::HeirConfig { .. } => true,
             WalletSubcmd::LedgerPolicies { subcmd } => match subcmd {
                 WalletLedgerPolicySubcmd::AutoRegister
@@ -576,7 +577,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 Box::new(wallet_status.block_inclusion_objective)
             }
             WalletSubcmd::Fingerprint => Box::new(wallet_ref.borrow().fingerprint()?),
-            WalletSubcmd::BackupMnemonic {
+            WalletSubcmd::Mnemonic {
                 i_understand_what_i_am_doing: _,
             } => Box::new(wallet_ref.borrow().backup_mnemonic()?),
             WalletSubcmd::HeirConfig { kind } => {

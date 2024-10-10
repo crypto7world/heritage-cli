@@ -87,8 +87,9 @@ pub enum HeirSubcmd {
     },
     /// Display the fingerprint of the heir
     Fingerprint,
-    /// Display the mnemonic of the heir for backup purpose
-    BackupMnemonic,
+    /// Display the mnemonic of the heir for backup purposes
+    #[command(visible_alias = "backup-mnemonic")]
+    Mnemonic,
     /// Display the Heir Configuration for this heir
     HeirConfig,
 }
@@ -123,7 +124,7 @@ impl super::CommandExecutor for HeirSubcmd {
             HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&mut db)?);
 
         let need_key_provider = match &self {
-            HeirSubcmd::Create { .. } | HeirSubcmd::BackupMnemonic { .. } => true,
+            HeirSubcmd::Create { .. } | HeirSubcmd::Mnemonic { .. } => true,
             HeirSubcmd::Rename { .. }
             | HeirSubcmd::HeirConfig { .. }
             | HeirSubcmd::Remove { .. }
@@ -270,7 +271,7 @@ impl super::CommandExecutor for HeirSubcmd {
                 Box::new("Heir exported")
             }
             HeirSubcmd::Fingerprint => Box::new(heir.borrow().fingerprint()?),
-            HeirSubcmd::BackupMnemonic => Box::new(heir.borrow().backup_mnemonic()?),
+            HeirSubcmd::Mnemonic => Box::new(heir.borrow().backup_mnemonic()?),
             HeirSubcmd::HeirConfig => Box::new(heir.into_inner().heir_config),
         };
         Ok(res)

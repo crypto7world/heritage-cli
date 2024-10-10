@@ -118,8 +118,9 @@ pub enum HeirWalletSubcmd {
     },
     /// Display the fingerprint of the heir-wallet
     Fingerprint,
-    /// Display the mnemonic of the heir for backup purpose
-    BackupMnemonic,
+    /// Display the mnemonic of the heir-wallet for backup purposes
+    #[command(visible_alias = "backup-mnemonic")]
+    Mnemonic,
     /// Generate an Heir Configuration from this heir-wallet that can be used as an heir for an Heritage wallet
     HeirConfig {
         /// The kind of Heir Configuration to generate
@@ -197,7 +198,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
             HeirWalletSubcmd::Rename { .. }
             | HeirWalletSubcmd::Remove { .. }
             | HeirWalletSubcmd::Fingerprint
-            | HeirWalletSubcmd::BackupMnemonic
+            | HeirWalletSubcmd::Mnemonic
             | HeirWalletSubcmd::SignPsbt { .. }
             | HeirWalletSubcmd::HeirConfig { .. } => false,
         };
@@ -205,7 +206,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
             HeirWalletSubcmd::Create { .. }
             | HeirWalletSubcmd::SignPsbt { .. }
             | HeirWalletSubcmd::HeirConfig { .. }
-            | HeirWalletSubcmd::BackupMnemonic { .. } => true,
+            | HeirWalletSubcmd::Mnemonic { .. } => true,
             HeirWalletSubcmd::SpendInheritance { sign, .. } if *sign => true,
             HeirWalletSubcmd::Rename { .. }
             | HeirWalletSubcmd::Sync
@@ -367,7 +368,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                 Box::new("Heir wallet deleted")
             }
             HeirWalletSubcmd::Fingerprint => Box::new(heir.borrow().fingerprint()?),
-            HeirWalletSubcmd::BackupMnemonic => Box::new(heir.borrow().backup_mnemonic()?),
+            HeirWalletSubcmd::Mnemonic => Box::new(heir.borrow().backup_mnemonic()?),
             HeirWalletSubcmd::HeirConfig { kind } => Box::new(
                 heir.borrow()
                     .key_provider()
