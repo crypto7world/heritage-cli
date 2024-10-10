@@ -276,7 +276,7 @@ heritage-cli heir backup backup-mnemonic
 heritage-cli heir wife backup-mnemonic
 ```
 
-The informations provided by these commands are all your heirs need to be able to spend your coins once you are not able to reset the deadman switch anymore. You can put those in sealed paper envelopes. It is safe, because as long as you don't loose your main access (and don't die), there is absolutely nothing anyone can do with these enveloppes.
+The information provided by these commands is all your heirs need to be able to spend your coins if the deadman switch is not reset. You can put those in sealed paper envelopes. It is safe, because as long as you don't loose your main access (and don't die), there is absolutely nothing anyone can do with these enveloppes.
 
 ### Synchronize the wallet
 
