@@ -2,7 +2,7 @@
 
 ## Supported CLI Versions
 
-Please see [Releases](https://github.com/crypto7world/btc-heritage/releases/). We recommend using the [most recently released version](https://github.com/crypto7world/btc-heritage/releases/latest).
+Please see [Releases](https://github.com/crypto7world/heritage-cli/releases/). We recommend using the [most recently released version](https://github.com/crypto7world/heritage-cli/releases/latest).
 
 ## Reporting a Vulnerability
 
