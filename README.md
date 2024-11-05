@@ -130,10 +130,10 @@ You can find precompiled binaries for the major platforms in the Release section
 
 [Latest version](https://github.com/crypto7world/heritage-cli/releases/latest) - [All releases](https://github.com/crypto7world/heritage-cli/releases)
 
-If you wish to install the `v0.5.1-beta` for Linux, you can run:
+If you wish to install the `v0.5.2-beta` for Linux, you can run:
 
 ```shell
-version="v0.5.1-beta"
+version="v0.5.2-beta"
 wget https://github.com/crypto7world/heritage-cli/releases/download/${version}/heritage-cli-${version}-x86_64-unknown-linux-gnu.tar.gz
 tar xvzf heritage-cli-${version}-x86_64-unknown-linux-gnu.tar.gz
 ./heritage-cli # to verify it worked, should display usage instructions
