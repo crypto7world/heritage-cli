@@ -4,11 +4,14 @@ use std::{
 };
 
 use btc_heritage_wallet::{
+    bitcoin::{Amount, Denomination},
     btc_heritage::HeritageWalletBackup,
     errors::{Error, Result},
     heritage_service_api_client::Fingerprint,
     BoundFingerprint, Database, DatabaseItem, Heir, HeirWallet, Wallet,
 };
+use chrono::{DateTime, Utc};
+use serde::Serializer;
 
 pub fn ask_user_confirmation(prompt: &str) -> Result<bool> {
     print!("{prompt} Answer \"yes\" or \"no\" (default \"no\"): ");
@@ -76,4 +79,38 @@ pub(crate) fn parse_heritage_wallet_backup(
     val: &str,
 ) -> core::result::Result<HeritageWalletBackup, serde_json::Error> {
     serde_json::from_str(val)
+}
+
+pub(crate) fn serialize_amount<S: Serializer>(
+    amount: &Amount,
+    serializer: S,
+) -> core::result::Result<S::Ok, S::Error> {
+    if *amount >= Amount::from_btc(0.1).unwrap() {
+        serializer.serialize_str(&format!("{} BTC", amount.display_in(Denomination::Bitcoin)))
+    } else if *amount >= Amount::from_sat(10000) {
+        serializer.serialize_str(&format!(
+            "{} mBTC",
+            amount.display_in(Denomination::MilliBitcoin)
+        ))
+    } else {
+        serializer.serialize_str(&format!("{} sat", amount.display_in(Denomination::Satoshi)))
+    }
+}
+
+pub(crate) fn serialize_datetime<S: Serializer>(
+    dt: &DateTime<Utc>,
+    serializer: S,
+) -> core::result::Result<S::Ok, S::Error> {
+    serializer.serialize_str(&dt.to_string())
+}
+
+pub(crate) fn serialize_opt_datetime<S: Serializer>(
+    dt: &Option<DateTime<Utc>>,
+    serializer: S,
+) -> core::result::Result<S::Ok, S::Error> {
+    if let Some(dt) = dt {
+        serialize_datetime(dt, serializer)
+    } else {
+        serializer.serialize_str("None")
+    }
 }

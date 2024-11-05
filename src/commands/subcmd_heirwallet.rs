@@ -1,15 +1,16 @@
 use core::{any::Any, cell::RefCell};
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use btc_heritage_wallet::{
     bitcoin::{address::NetworkUnchecked, psbt::Psbt, Address},
-    btc_heritage::HeritageWalletBackup,
+    btc_heritage::{utils::timestamp_now, HeritageWalletBackup},
     errors::{Error, Result},
     heritage_provider::{LocalWallet, ServiceBinding},
     heritage_service_api_client::{Fingerprint, HeritageServiceClient, Tokens},
     AnyHeritageProvider, AnyKeyProvider, BoundFingerprint, Database, DatabaseItem, HeirWallet,
     Heritage, HeritageProvider, KeyProvider, Language, LocalKey, Mnemonic, OnlineWallet,
 };
+use chrono::{DateTime, Utc};
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 
 use crate::{
@@ -25,12 +26,14 @@ use super::{
 #[derive(Debug, serde::Serialize)]
 pub struct Inheritance {
     inheritance_id: String,
-    #[serde(with = "btc_heritage_wallet::btc_heritage::amount_serde")]
+    #[serde(serialize_with = "crate::utils::serialize_amount")]
     value: btc_heritage_wallet::bitcoin::Amount,
     /// The timestamp after which the Heir is able to spend
-    maturity: u64,
+    #[serde(serialize_with = "crate::utils::serialize_datetime")]
+    maturity: DateTime<Utc>,
     /// The maturity of the next heir, if any
-    next_heir_maturity: Option<u64>,
+    #[serde(serialize_with = "crate::utils::serialize_opt_datetime")]
+    next_heir_maturity: Option<DateTime<Utc>>,
 }
 impl crate::display::SerdeDisplay for Inheritance {}
 impl From<Heritage> for Inheritance {
@@ -44,8 +47,11 @@ impl From<Heritage> for Inheritance {
         Inheritance {
             inheritance_id: heritage_id,
             value,
-            maturity,
-            next_heir_maturity,
+            maturity: DateTime::from_timestamp(maturity as i64, 0)
+                .expect("maturiy timestamp is in range"),
+            next_heir_maturity: next_heir_maturity.map(|ts| {
+                DateTime::from_timestamp(ts as i64, 0).expect("maturiy timestamp is in range")
+            }),
         }
     }
 }
@@ -131,7 +137,15 @@ pub enum HeirWalletSubcmd {
     Sync,
     /// Display all currently spendable inheritances and their IDs
     #[command(visible_aliases = ["list-inheritance", "list-heritages", "list-heritage", "li"])]
-    ListInheritances,
+    ListInheritances {
+        /// Also take into account immature UTXO when computing the inheritance amount (the maturity date will
+        /// probably be wrong, use `--details` to retrieve complete informations)
+        #[arg(long, default_value_t = false)]
+        immatures: bool,
+        /// Do not aggregate and display each UTXO as a standalone inheritance (will duplicate IDs)
+        #[arg(long, default_value_t = false)]
+        details: bool,
+    },
     /// Create a Partially Signed Bitcoin Transaction (PSBT), a.k.a an Unsigned TX, from the provided information
     #[command(visible_aliases = ["send-inheritance", "send-heritage", "spend-heritage", "send", "spend", "si"])]
     SpendInheritance {
@@ -191,7 +205,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
         let need_heritage_provider = match &self {
             HeirWalletSubcmd::Create { .. }
             | HeirWalletSubcmd::Sync
-            | HeirWalletSubcmd::ListInheritances
+            | HeirWalletSubcmd::ListInheritances { .. }
             | HeirWalletSubcmd::SpendInheritance { .. }
             | HeirWalletSubcmd::BroadcastPsbt { .. } => true,
             HeirWalletSubcmd::SignPsbt { broadcast, .. } if *broadcast => true,
@@ -213,7 +227,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
             | HeirWalletSubcmd::SpendInheritance { .. }
             | HeirWalletSubcmd::Remove { .. }
             | HeirWalletSubcmd::Fingerprint
-            | HeirWalletSubcmd::ListInheritances
+            | HeirWalletSubcmd::ListInheritances { .. }
             | HeirWalletSubcmd::BroadcastPsbt { .. } => false,
         };
         let need_blockchain_provider = match &self {
@@ -387,13 +401,49 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                 local_wallet.local_heritage_wallet_mut().sync()?;
                 Box::new("Synchronization done")
             }
-            HeirWalletSubcmd::ListInheritances => Box::new(
-                heir.borrow()
-                    .list_heritages()?
-                    .into_iter()
-                    .map(Inheritance::from)
-                    .collect::<Vec<_>>(),
-            ),
+            HeirWalletSubcmd::ListInheritances { immatures, details } => {
+                let heritages = heir.borrow().list_heritages()?;
+
+                let heritages = if immatures {
+                    // If will want to take immature UTXO into account, just pass the Vec as-is
+                    heritages
+                } else {
+                    // Else, filter out every inheritances that have a maturity greater than now
+                    heritages
+                        .into_iter()
+                        .filter(|h| h.maturity <= timestamp_now())
+                        .collect()
+                };
+
+                let heritages = if details {
+                    // If we want to have the details, do not aggregate and pass the Vec as-is
+                    heritages
+                } else {
+                    let mut aggregator: HashMap<String, Heritage> = HashMap::new();
+                    for heritage in heritages {
+                        aggregator
+                            .entry(heritage.heritage_id.clone())
+                            .and_modify(|agg| {
+                                agg.value += heritage.value;
+                                agg.maturity = agg.maturity.max(heritage.maturity);
+                                agg.next_heir_maturity =
+                                    match (agg.next_heir_maturity, heritage.next_heir_maturity) {
+                                        (None, None) => None,
+                                        (None, Some(v)) | (Some(v), None) => Some(v),
+                                        (Some(a), Some(b)) => Some(a.min(b)),
+                                    };
+                            })
+                            .or_insert(heritage);
+                    }
+                    aggregator.into_values().collect()
+                };
+                Box::new(
+                    heritages
+                        .into_iter()
+                        .map(Inheritance::from)
+                        .collect::<Vec<_>>(),
+                )
+            }
             HeirWalletSubcmd::SpendInheritance {
                 id,
                 recipient,
