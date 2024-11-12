@@ -218,6 +218,15 @@ pub enum WalletSubcmd {
             conflicts_with = "exclude"
         )]
         include_only: bool,
+        /// Disable the Replace-By-Fee flag of the transaction
+        ///
+        /// If this flag is set, RBF is disabled. It signals that the transaction should
+        /// not be replaced by another one with a higher fee in the mempool.
+        /// Note that starting from Bitcoin Core v28.0, Full-RBF is the default configuration
+        /// of the Bitcoin nodes, therefore this Transaction flag will be more and more
+        /// ignored by the nodes (and RBF will always be enabled)
+        #[arg(long, default_value_t = false)]
+        disable_rbf: bool,
         /// Immediately sign the PSBT
         #[arg(short, long, default_value_t = false)]
         sign: bool,
@@ -611,6 +620,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 include,
                 exclude,
                 include_only,
+                disable_rbf,
                 sign,
                 broadcast,
                 skip_confirmation,
@@ -694,12 +704,15 @@ impl super::CommandExecutor for WalletSubcmd {
                     None
                 };
 
+                let disable_rbf = if disable_rbf { Some(true) } else { None };
+
                 let wallet = wallet_ref.borrow();
                 // Get the PSBT
                 let (psbt, summary) = wallet.create_psbt(NewTx {
                     spending_config,
                     fee_policy,
                     utxo_selection,
+                    disable_rbf,
                 })?;
                 SpendFlow::new(psbt, gargs.network)
                     .transaction_summary(&summary)
