@@ -1,13 +1,15 @@
 use core::{any::Any, cell::RefCell, str::FromStr};
-use std::{io::Write, path::PathBuf, rc::Rc};
+use std::{collections::HashSet, io::Write, path::PathBuf, rc::Rc};
 
 use btc_heritage_wallet::{
-    bitcoin::{address::NetworkUnchecked, bip32::Fingerprint, psbt::Psbt, Address, Amount},
+    bitcoin::{
+        address::NetworkUnchecked, bip32::Fingerprint, psbt::Psbt, Address, Amount, OutPoint,
+    },
     btc_heritage::HeritageWalletBackup,
     errors::{Error, Result},
     heritage_service_api_client::{
         HeritageServiceClient, NewTx, NewTxDrainTo, NewTxFeePolicy, NewTxRecipient,
-        NewTxSpendingConfig, Tokens,
+        NewTxSpendingConfig, NewTxUtxoSelection, Tokens,
     },
     online_wallet::{LocalHeritageWallet, ServiceBinding},
     AnyKeyProvider, AnyOnlineWallet, BoundFingerprint, Database, DatabaseItem, KeyProvider,
@@ -202,6 +204,20 @@ pub enum WalletSubcmd {
             conflicts_with = "fee_rate"
         )]
         fee_absolute: Option<Amount>,
+        /// Force the spending of the given UTXO(s) in the transaction
+        #[arg(long, value_name = "OUTPOINT")]
+        include: Vec<OutPoint>,
+        /// Forbid the spending of the given UTXO(s) in the transaction
+        #[arg(long, value_name = "OUTPOINT")]
+        exclude: Vec<OutPoint>,
+        /// Spend only the UTXO(s) of the "include" list
+        #[arg(
+            long,
+            default_value_t = false,
+            requires = "include",
+            conflicts_with = "exclude"
+        )]
+        include_only: bool,
         /// Immediately sign the PSBT
         #[arg(short, long, default_value_t = false)]
         sign: bool,
@@ -592,6 +608,9 @@ impl super::CommandExecutor for WalletSubcmd {
                 recipient,
                 fee_rate,
                 fee_absolute,
+                include,
+                exclude,
+                include_only,
                 sign,
                 broadcast,
                 skip_confirmation,
@@ -648,12 +667,39 @@ impl super::CommandExecutor for WalletSubcmd {
                     None
                 };
 
+                // Deduplicate include and exclude
+                let include = include
+                    .into_iter()
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .collect::<Vec<_>>();
+
+                let exclude = exclude
+                    .into_iter()
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .collect::<Vec<_>>();
+
+                let utxo_selection = if include.len() > 0 && exclude.len() > 0 {
+                    Some(NewTxUtxoSelection::IncludeExclude { include, exclude })
+                } else if include.len() > 0 {
+                    if include_only {
+                        Some(NewTxUtxoSelection::UseOnly { use_only: include })
+                    } else {
+                        Some(NewTxUtxoSelection::Include { include })
+                    }
+                } else if exclude.len() > 0 {
+                    Some(NewTxUtxoSelection::Exclude { exclude })
+                } else {
+                    None
+                };
+
                 let wallet = wallet_ref.borrow();
                 // Get the PSBT
                 let (psbt, summary) = wallet.create_psbt(NewTx {
                     spending_config,
                     fee_policy,
-                    utxo_selection: None,
+                    utxo_selection,
                 })?;
                 SpendFlow::new(psbt, gargs.network)
                     .transaction_summary(&summary)
