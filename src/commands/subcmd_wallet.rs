@@ -648,6 +648,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 let (psbt, summary) = wallet.create_psbt(NewTx {
                     spending_config,
                     fee_policy,
+                    utxo_selection: None,
                 })?;
                 SpendFlow::new(psbt, gargs.network)
                     .transaction_summary(&summary)
