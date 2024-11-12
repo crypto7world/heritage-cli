@@ -134,6 +134,8 @@ pub enum WalletSubcmd {
     Addresses,
     /// List all the past transactions for this wallet
     Transactions,
+    /// List all the UTXOs of this wallet
+    Utxos,
     /// Commands managing the Ledger wallet policies (BIP388) of the wallet
     #[command(visible_aliases = ["ledger-policy", "lp"])]
     LedgerPolicies {
@@ -275,6 +277,7 @@ impl super::CommandExecutor for WalletSubcmd {
             | WalletSubcmd::BlockInclusionObjective { .. }
             | WalletSubcmd::Addresses
             | WalletSubcmd::Transactions
+            | WalletSubcmd::Utxos
             | WalletSubcmd::NewAddress
             | WalletSubcmd::HeritageConfigs { .. } => true,
             WalletSubcmd::SignPsbt { broadcast, .. } if *broadcast => true,
@@ -318,6 +321,7 @@ impl super::CommandExecutor for WalletSubcmd {
             | WalletSubcmd::Remove
             | WalletSubcmd::NewAddress
             | WalletSubcmd::Addresses
+            | WalletSubcmd::Utxos
             | WalletSubcmd::Transactions
             | WalletSubcmd::HeritageConfigs { .. }
             | WalletSubcmd::Sync
@@ -556,6 +560,7 @@ impl super::CommandExecutor for WalletSubcmd {
             WalletSubcmd::Transactions => {
                 Box::new(wallet.borrow().online_wallet().list_transactions()?)
             }
+            WalletSubcmd::Utxos => Box::new(wallet.borrow().online_wallet().list_heritage_utxos()?),
             WalletSubcmd::LedgerPolicies { subcmd } => {
                 subcmd.execute(Box::new((wallet.clone(), db)))?
             }

@@ -4,7 +4,8 @@ use btc_heritage_wallet::{
         HeritageConfig, HeritageWalletBackup,
     },
     heritage_service_api_client::{
-        AccountXPubWithStatus, Fingerprint, Heir, Heritage, HeritageWalletMeta, TransactionSummary,
+        AccountXPubWithStatus, Fingerprint, Heir, Heritage, HeritageUtxo, HeritageWalletMeta,
+        TransactionSummary,
     },
     key_provider::MnemonicBackup,
     ledger::WalletPolicy,
@@ -74,6 +75,7 @@ serde_display!(HeritageConfig);
 serde_display!(AccountXPubWithStatus);
 serde_display!(WalletStatus);
 serde_display!(TransactionSummary);
+serde_display!(HeritageUtxo);
 serde_display!(BlockInclusionObjective);
 serde_display!(HeritageWalletBackup);
 serde_display!(PsbtSummary);
