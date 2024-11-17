@@ -45,9 +45,6 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Remove rust-toolchain.toml
-        run: rm rust-toolchain.toml
-
       - name: Get Rust
         if: matrix.arch != 'x86_64-windows'
         run: |
