@@ -114,7 +114,8 @@ impl super::CommandExecutor for WalletHeritageConfigSubcmd {
 
                             let mut local_heirs_index: HashMap<String, HeirConfig> =
                                 if local_heir.len() > 0 {
-                                    Heir::all_in_db(&db)?
+                                    Heir::all_in_db(&db)
+                                        .await?
                                         .into_iter()
                                         .map(|h| (h.name, h.heir_config))
                                         .collect()

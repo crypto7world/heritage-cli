@@ -202,7 +202,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
 
         let service_client = HeritageServiceClient::new(
             service_gargs.service_api_url.clone(),
-            Tokens::load(&mut db)?,
+            Tokens::load(&mut db).await?,
         );
 
         let need_heritage_provider = match &self {
@@ -251,7 +251,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                 word_count,
                 with_password,
             } => {
-                HeirWallet::verify_name_is_free(&db, &heir_wallet_name)?;
+                HeirWallet::verify_name_is_free(&db, &heir_wallet_name).await?;
                 let key_provider = match key_provider {
                     KeyProviderType::None => AnyKeyProvider::None,
                     KeyProviderType::Local => {
@@ -316,7 +316,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                 heir
             }
             _ => {
-                let mut heir = HeirWallet::load(&db, &heir_wallet_name)?;
+                let mut heir = HeirWallet::load(&db, &heir_wallet_name).await?;
                 if need_key_provider {
                     match heir.key_provider_mut() {
                         AnyKeyProvider::None => (),
@@ -336,7 +336,9 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                         AnyHeritageProvider::None => (),
                         AnyHeritageProvider::Service(sb) => sb.init_service_client(service_client),
                         AnyHeritageProvider::LocalWallet(lw) => {
-                            lw.local_heritage_wallet_mut().init_heritage_wallet(&db)?;
+                            lw.local_heritage_wallet_mut()
+                                .init_heritage_wallet(&db)
+                                .await?;
                             if need_blockchain_provider {
                                 let bcpc_with_network = BlockchainProviderConfigWithNetwork {
                                     bcpc,
@@ -356,15 +358,15 @@ impl super::CommandExecutor for HeirWalletSubcmd {
 
         let res: Box<dyn crate::display::Displayable> = match self {
             HeirWalletSubcmd::Create { .. } => {
-                heir.create(&mut db)?;
+                heir.create(&mut db).await?;
                 Box::new("Heir wallet created")
             }
             HeirWalletSubcmd::Rename { new_name } => {
                 // First verify the destination name is free
-                HeirWallet::verify_name_is_free(&db, &new_name)?;
+                HeirWallet::verify_name_is_free(&db, &new_name).await?;
                 // Rename
                 let mut heir = heir;
-                heir.db_rename(&mut db, new_name)?;
+                heir.db_rename(&mut db, new_name).await?;
                 Box::new("Heir wallet renamed")
             }
             HeirWalletSubcmd::Remove {
@@ -388,7 +390,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                         return Ok(Box::new("Delete heir-wallet cancelled"));
                     }
                 }
-                heir.delete(&mut db)?;
+                heir.delete(&mut db).await?;
                 Box::new("Heir wallet deleted")
             }
             HeirWalletSubcmd::Fingerprint => Box::new(heir.fingerprint()?),
@@ -467,7 +469,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                 // Get the PSBT
                 let (psbt, summary) = heir.create_psbt(&id, recipient).await?;
                 SpendFlow::new(psbt, gargs.network)
-                    .fingerprints(&get_fingerprints(&db)?)
+                    .fingerprints(&get_fingerprints(&db).await?)
                     .transaction_summary(&summary)
                     .display()
                     .set_skip_confirmations(skip_confirmation)
@@ -490,7 +492,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                 skip_confirmation,
             } => {
                 SpendFlow::new(psbt, gargs.network)
-                    .fingerprints(&get_fingerprints(&db)?)
+                    .fingerprints(&get_fingerprints(&db).await?)
                     .sign(heir.key_provider())
                     .set_skip_confirmations(skip_confirmation)
                     .set_broadcast(if broadcast {

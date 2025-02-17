@@ -63,7 +63,7 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                         "Ledger",
                     ));
                 };
-                wallet.save(&mut db)?;
+                wallet.save(&mut db).await?;
                 Box::new(format!("{count} policies registered"))
             }
             WalletLedgerPolicySubcmd::AutoRegister => {
@@ -108,7 +108,7 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                 } else {
                     unreachable!("already confirmed it is a Ledger")
                 };
-                wallet.save(&mut db)?;
+                wallet.save(&mut db).await?;
                 Box::new(format!("{count} new policies registered"))
             }
         };

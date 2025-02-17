@@ -124,7 +124,7 @@ impl super::CommandExecutor for HeirSubcmd {
         ) = *params.downcast().unwrap();
 
         let service_client =
-            HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&mut db)?);
+            HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&mut db).await?);
 
         let need_key_provider = match &self {
             HeirSubcmd::Create { .. } | HeirSubcmd::Mnemonic { .. } => true,
@@ -148,7 +148,7 @@ impl super::CommandExecutor for HeirSubcmd {
                 custom_message,
                 permissions,
             } => {
-                Heir::verify_name_is_free(&db, &heir_name)?;
+                Heir::verify_name_is_free(&db, &heir_name).await?;
                 let key_provider = match key_provider {
                     KeyProviderType::None => AnyKeyProvider::None,
                     KeyProviderType::Local => {
@@ -205,7 +205,7 @@ impl super::CommandExecutor for HeirSubcmd {
                 heir
             }
             _ => {
-                let mut heir = Heir::load(&db, &heir_name)?;
+                let mut heir = Heir::load(&db, &heir_name).await?;
                 if need_key_provider {
                     match heir.key_provider_mut() {
                         AnyKeyProvider::None => (),
@@ -227,15 +227,15 @@ impl super::CommandExecutor for HeirSubcmd {
 
         let res: Box<dyn crate::display::Displayable> = match self {
             HeirSubcmd::Create { .. } => {
-                heir.create(&mut db)?;
+                heir.create(&mut db).await?;
                 Box::new("Heir created")
             }
             HeirSubcmd::Rename { new_name } => {
                 // First verify the destination name is free
-                Heir::verify_name_is_free(&db, &new_name)?;
+                Heir::verify_name_is_free(&db, &new_name).await?;
                 // Rename
                 let mut heir = heir;
-                heir.db_rename(&mut db, new_name)?;
+                heir.db_rename(&mut db, new_name).await?;
                 Box::new("Heir renamed")
             }
             HeirSubcmd::Remove {
@@ -261,7 +261,7 @@ impl super::CommandExecutor for HeirSubcmd {
                         return Ok(Box::new("Delete heir-wallet cancelled"));
                     }
                 }
-                heir.delete(&mut db)?;
+                heir.delete(&mut db).await?;
                 Box::new("Heir deleted")
             }
             HeirSubcmd::Export {

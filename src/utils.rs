@@ -54,23 +54,27 @@ pub fn prompt_user_for_password(double_check: bool) -> Result<String> {
     Ok(passphrase1)
 }
 
-pub fn get_fingerprints(db: &Database) -> Result<HashMap<Fingerprint, Vec<String>>> {
+pub async fn get_fingerprints(db: &Database) -> Result<HashMap<Fingerprint, Vec<String>>> {
     let mut map = HashMap::new();
-    for heir in Heir::all_in_db(&db)?.into_iter() {
+    // TODO: this is sequentially executed.
+    // That is not a problem considering the Databse is in fact quite quick
+    // But for the "beauty of the gesture" I should consider how to do that truly concurrently
+    // if it is at all possible (but it may well not be as there is a lock on the DB)
+    for heir in Heir::all_in_db(&db).await?.into_iter() {
         if let Some(fingerprint) = heir.fingerprint().ok() {
             map.entry(fingerprint)
                 .or_insert(vec![])
                 .push(format!("heir:{}", heir.name()))
         }
     }
-    for heir_wallet in HeirWallet::all_in_db(&db)?.into_iter() {
+    for heir_wallet in HeirWallet::all_in_db(&db).await?.into_iter() {
         if let Some(fingerprint) = heir_wallet.fingerprint().ok() {
             map.entry(fingerprint)
                 .or_insert(vec![])
                 .push(format!("heir-wallet:{}", heir_wallet.name()))
         }
     }
-    for wallet in Wallet::all_in_db(&db)?.into_iter() {
+    for wallet in Wallet::all_in_db(&db).await?.into_iter() {
         if let Some(fingerprint) = wallet.fingerprint().ok() {
             map.entry(fingerprint)
                 .or_insert(vec![])

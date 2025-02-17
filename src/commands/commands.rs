@@ -117,14 +117,14 @@ impl<
 
         match self {
             ListAndDefault::List => {
-                let wallet_names = I::list_names(&db)?;
+                let wallet_names = I::list_names(&db).await?;
                 Ok(Box::new(wallet_names))
             }
             ListAndDefault::DefaultName { new_name } => {
                 if let Some(new_name) = new_name {
-                    I::set_default_item_name(&mut db, new_name)?;
+                    I::set_default_item_name(&mut db, new_name).await?;
                 }
-                Ok(Box::new(I::get_default_item_name(&db)?))
+                Ok(Box::new(I::get_default_item_name(&db).await?))
             }
             ListAndDefault::Others(sub) => {
                 let params = Box::new((db, name, gargs, service_gargs, bcpc));
@@ -145,11 +145,13 @@ impl super::CommandExecutor for Command {
             super::ServiceGlobalArgs,
             super::gargs_blockchain_provider::BlockchainProviderGlobalArgs,
         ) = *params.downcast().unwrap();
-        let mut db = Database::new(&gargs.datadir, gargs.network)?;
-        const DEFAULT_BCPC_KEY: &'static str = "default_bcpc";
+        let mut db = Database::new(&gargs.datadir, gargs.network).await?;
+
         let bcpc = match BlockchainProviderConfig::try_from(blockchain_provider_gargs) {
             Ok(bcpc) => bcpc,
-            Err(bcpc) => db.get_item(DEFAULT_BCPC_KEY)?.unwrap_or(bcpc),
+            Err(bcpc) => BlockchainProviderConfig::load(&db, BlockchainProviderConfig::NAME)
+                .await
+                .unwrap_or(bcpc),
         };
         match self {
             Command::Wallet {
@@ -158,7 +160,7 @@ impl super::CommandExecutor for Command {
             } => {
                 let wallet_name = match wallet_name {
                     Some(wn) => wn,
-                    None => Wallet::get_default_item_name(&db)?,
+                    None => Wallet::get_default_item_name(&db).await?,
                 };
                 let params = Box::new((db, wallet_name, gargs, service_gargs, bcpc));
                 subcmd.execute(params).await
@@ -166,7 +168,7 @@ impl super::CommandExecutor for Command {
             Command::Heir { heir_name, subcmd } => {
                 let heir_name = match heir_name {
                     Some(wn) => wn,
-                    None => Heir::get_default_item_name(&db)?,
+                    None => Heir::get_default_item_name(&db).await?,
                 };
                 let params = Box::new((db, heir_name, gargs, service_gargs, bcpc));
                 subcmd.execute(params).await
@@ -177,7 +179,7 @@ impl super::CommandExecutor for Command {
             } => {
                 let heir_wallet_name = match heir_wallet_name {
                     Some(wn) => wn,
-                    None => HeirWallet::get_default_item_name(&db)?,
+                    None => HeirWallet::get_default_item_name(&db).await?,
                 };
                 let params = Box::new((db, heir_wallet_name, gargs, service_gargs, bcpc));
                 subcmd.execute(params).await
@@ -188,13 +190,14 @@ impl super::CommandExecutor for Command {
             }
             Command::BlockchainProvider { set } => {
                 if set {
-                    db.update_item(DEFAULT_BCPC_KEY, &bcpc)?;
+                    bcpc.save(&mut db).await?;
                 }
                 Ok(Box::new(bcpc))
             }
             Command::DisplayPsbt { psbt } => {
                 let network = gargs.network;
-                let summary = PsbtSummary::try_from((&psbt, &get_fingerprints(&db)?, network))?;
+                let summary =
+                    PsbtSummary::try_from((&psbt, &get_fingerprints(&db).await?, network))?;
                 Ok(Box::new(summary))
             }
         }

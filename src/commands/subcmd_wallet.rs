@@ -293,7 +293,7 @@ impl super::CommandExecutor for WalletSubcmd {
         ) = *params.downcast().unwrap();
 
         let service_client =
-            HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&db)?);
+            HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&db).await?);
 
         let need_online_wallet = match &self {
             WalletSubcmd::Create { .. }
@@ -381,7 +381,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 block_inclusion_objective,
                 ..
             } => {
-                Wallet::verify_name_is_free(&db, &wallet_name)?;
+                Wallet::verify_name_is_free(&db, &wallet_name).await?;
                 let backup = if let Some(backup_file) = backup_file {
                     Some(crate::utils::parse_heritage_wallet_backup(
                         &std::fs::read_to_string(backup_file.as_path()).map_err(Error::generic)?,
@@ -453,7 +453,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 wallet
             }
             _ => {
-                let mut wallet = Wallet::load(&db, &wallet_name)?;
+                let mut wallet = Wallet::load(&db, &wallet_name).await?;
                 if need_key_provider {
                     match wallet.key_provider_mut() {
                         AnyKeyProvider::None => (),
@@ -475,7 +475,7 @@ impl super::CommandExecutor for WalletSubcmd {
                             sb.init_service_client(service_client).await?
                         }
                         AnyOnlineWallet::Local(lw) => {
-                            lw.init_heritage_wallet(&db)?;
+                            lw.init_heritage_wallet(&db).await?;
                             if need_blockchain_provider {
                                 let bcpc_with_network = BlockchainProviderConfigWithNetwork {
                                     bcpc,
@@ -496,7 +496,7 @@ impl super::CommandExecutor for WalletSubcmd {
             WalletSubcmd::Create {
                 no_auto_feed_xpubs, ..
             } => {
-                wallet.create(&mut db)?;
+                wallet.create(&mut db).await?;
                 // Auto-feed
                 if !(no_auto_feed_xpubs
                     || wallet.key_provider().is_none()
@@ -513,7 +513,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 local_only,
             } => {
                 // First verify the destination name is free
-                Wallet::verify_name_is_free(&db, &new_name)?;
+                Wallet::verify_name_is_free(&db, &new_name).await?;
                 if let AnyOnlineWallet::Service(sb) = wallet.online_wallet() {
                     if !local_only {
                         let cmd = subcmd_service_wallet::WalletSubcmd::Update {
@@ -530,7 +530,7 @@ impl super::CommandExecutor for WalletSubcmd {
                     }
                 };
                 // Rename
-                wallet.db_rename(&mut db, new_name)?;
+                wallet.db_rename(&mut db, new_name).await?;
                 Box::new("Wallet renamed")
             }
             WalletSubcmd::Backup {
@@ -591,7 +591,7 @@ impl super::CommandExecutor for WalletSubcmd {
                         return Ok(Box::new("Delete wallet cancelled"));
                     }
                 }
-                wallet.delete(&mut db)?;
+                wallet.delete(&mut db).await?;
                 Box::new("Wallet deleted")
             }
             WalletSubcmd::NewAddress => Box::new(wallet.online_wallet().get_address().await?),
@@ -731,7 +731,7 @@ impl super::CommandExecutor for WalletSubcmd {
                     .await?;
                 SpendFlow::new(psbt, gargs.network)
                     .transaction_summary(&summary)
-                    .fingerprints(&get_fingerprints(&db)?)
+                    .fingerprints(&get_fingerprints(&db).await?)
                     .display()
                     .set_sign(if sign {
                         Some(wallet.key_provider())
@@ -753,7 +753,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 skip_confirmation,
             } => {
                 SpendFlow::new(psbt, gargs.network)
-                    .fingerprints(&get_fingerprints(&db)?)
+                    .fingerprints(&get_fingerprints(&db).await?)
                     .sign(wallet.key_provider())
                     .set_skip_confirmations(skip_confirmation)
                     .set_broadcast(if broadcast {

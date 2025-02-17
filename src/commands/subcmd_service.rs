@@ -44,7 +44,7 @@ impl super::CommandExecutor for ServiceSubcmd {
             *params.downcast().unwrap();
 
         let service_client =
-            HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&db)?);
+            HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&db).await?);
 
         let res: Box<dyn crate::display::Displayable> = match self {
             ServiceSubcmd::Login => Tokens::new(
@@ -74,6 +74,7 @@ impl super::CommandExecutor for ServiceSubcmd {
             )
             .await?
             .save(&mut db)
+            .await
             .map(|()| Box::new("Login successful"))?,
             ServiceSubcmd::Logout => todo!(),
             ServiceSubcmd::ListWallets => service_client.list_wallets().await.map(Box::new)?,

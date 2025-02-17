@@ -7,6 +7,7 @@ use btc_heritage_wallet::{
         electrum_client,
     },
     online_wallet::AnyBlockchainFactory,
+    DatabaseItem,
 };
 use serde::{Deserialize, Serialize};
 
@@ -71,6 +72,26 @@ pub enum BlockchainProviderConfig {
 }
 
 impl SerdeDisplay for BlockchainProviderConfig {}
+impl BlockchainProviderConfig {
+    pub const NAME: &'static str = "default";
+}
+impl DatabaseItem for BlockchainProviderConfig {
+    fn item_key_prefix() -> &'static str {
+        "bcpc#"
+    }
+
+    fn item_default_name_key_prefix() -> &'static str {
+        unimplemented!()
+    }
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+
+    fn rename(&mut self, _new_name: String) {
+        unimplemented!()
+    }
+}
 
 impl Default for BlockchainProviderConfig {
     fn default() -> Self {
