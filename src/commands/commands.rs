@@ -146,12 +146,10 @@ impl super::CommandExecutor for Command {
             super::gargs_blockchain_provider::BlockchainProviderGlobalArgs,
         ) = *params.downcast().unwrap();
         let mut db = Database::new(&gargs.datadir, gargs.network).await?;
-
+        const DEFAULT_BCPC_KEY: &'static str = "default_bcpc";
         let bcpc = match BlockchainProviderConfig::try_from(blockchain_provider_gargs) {
             Ok(bcpc) => bcpc,
-            Err(bcpc) => BlockchainProviderConfig::load(&db, BlockchainProviderConfig::NAME)
-                .await
-                .unwrap_or(bcpc),
+            Err(bcpc) => db.get_item(DEFAULT_BCPC_KEY).await?.unwrap_or(bcpc),
         };
         match self {
             Command::Wallet {
@@ -190,7 +188,7 @@ impl super::CommandExecutor for Command {
             }
             Command::BlockchainProvider { set } => {
                 if set {
-                    bcpc.save(&mut db).await?;
+                    db.update_item(DEFAULT_BCPC_KEY, &bcpc).await?;
                 }
                 Ok(Box::new(bcpc))
             }
