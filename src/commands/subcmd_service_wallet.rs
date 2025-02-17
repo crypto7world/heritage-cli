@@ -22,23 +22,26 @@ pub enum WalletSubcmd {
 }
 
 impl super::CommandExecutor for WalletSubcmd {
-    fn execute(self, params: Box<dyn Any>) -> Result<Box<dyn crate::display::Displayable>> {
+    async fn execute(
+        self,
+        params: Box<dyn Any + Send>,
+    ) -> Result<Box<dyn crate::display::Displayable>> {
         let (wallet_id, service_client): (String, HeritageServiceClient) =
             *params.downcast().unwrap();
 
         let res: Box<dyn crate::display::Displayable> = match self {
-            WalletSubcmd::Get => Box::new(service_client.get_wallet(&wallet_id)?),
+            WalletSubcmd::Get => Box::new(service_client.get_wallet(&wallet_id).await?),
             WalletSubcmd::Update {
                 name,
                 block_inclusion_objective,
             } => {
                 let block_inclusion_objective =
                     block_inclusion_objective.map(BlockInclusionObjective::from);
-                Box::new(service_client.patch_wallet(
-                    &wallet_id,
-                    name,
-                    block_inclusion_objective,
-                )?)
+                Box::new(
+                    service_client
+                        .patch_wallet(&wallet_id, name, block_inclusion_objective)
+                        .await?,
+                )
             }
         };
         Ok(res)

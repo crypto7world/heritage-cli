@@ -1,5 +1,5 @@
-use core::{any::Any, cell::RefCell, str::FromStr};
-use std::{collections::HashSet, io::Write, path::PathBuf, rc::Rc};
+use core::{any::Any, str::FromStr};
+use std::{collections::HashSet, io::Write, path::PathBuf};
 
 use btc_heritage_wallet::{
     bitcoin::{
@@ -280,7 +280,10 @@ pub enum KeyProviderType {
 }
 
 impl super::CommandExecutor for WalletSubcmd {
-    fn execute(mut self, params: Box<dyn Any>) -> Result<Box<dyn crate::display::Displayable>> {
+    async fn execute(
+        mut self,
+        params: Box<dyn Any + Send>,
+    ) -> Result<Box<dyn crate::display::Displayable>> {
         let (mut db, wallet_name, gargs, service_gargs, bcpc): (
             Database,
             String,
@@ -363,7 +366,7 @@ impl super::CommandExecutor for WalletSubcmd {
             _ => false,
         };
 
-        let wallet = match &mut self {
+        let mut wallet = match &mut self {
             WalletSubcmd::Create {
                 online_wallet,
                 existing_service_wallet_name,
@@ -375,8 +378,8 @@ impl super::CommandExecutor for WalletSubcmd {
                 seed,
                 word_count,
                 no_password,
-                no_auto_feed_xpubs,
                 block_inclusion_objective,
+                ..
             } => {
                 Wallet::verify_name_is_free(&db, &wallet_name)?;
                 let backup = if let Some(backup_file) = backup_file {
@@ -411,26 +414,25 @@ impl super::CommandExecutor for WalletSubcmd {
                         AnyKeyProvider::LocalKey(local_key)
                     }
                     KeyProviderType::Ledger => {
-                        AnyKeyProvider::Ledger(LedgerKey::new(gargs.network)?)
+                        AnyKeyProvider::Ledger(LedgerKey::new(gargs.network).await?)
                     }
                 };
                 let online_wallet = match online_wallet {
                     OnlineWalletType::None => AnyOnlineWallet::None,
                     OnlineWalletType::Service => AnyOnlineWallet::Service(
                         if let Some(wallet_name) = existing_service_wallet_name {
-                            ServiceBinding::bind_by_name(
-                                wallet_name,
-                                service_client,
-                                gargs.network,
-                            )?
+                            ServiceBinding::bind_by_name(wallet_name, service_client, gargs.network)
+                                .await?
                         } else if let Some(fingerprint) = existing_service_wallet_fingerprint {
                             ServiceBinding::bind_by_fingerprint(
                                 *fingerprint,
                                 service_client,
                                 gargs.network,
-                            )?
+                            )
+                            .await?
                         } else if let Some(wallet_id) = existing_service_wallet_id {
-                            ServiceBinding::bind_by_id(&wallet_id, service_client, gargs.network)?
+                            ServiceBinding::bind_by_id(&wallet_id, service_client, gargs.network)
+                                .await?
                         } else {
                             ServiceBinding::create(
                                 &wallet_name,
@@ -438,25 +440,16 @@ impl super::CommandExecutor for WalletSubcmd {
                                 *block_inclusion_objective,
                                 service_client,
                                 gargs.network,
-                            )?
+                            )
+                            .await?
                         },
                     ),
-                    OnlineWalletType::Local => AnyOnlineWallet::Local(LocalHeritageWallet::create(
-                        &db,
-                        backup,
-                        *block_inclusion_objective,
-                    )?),
+                    OnlineWalletType::Local => AnyOnlineWallet::Local(
+                        LocalHeritageWallet::create(&db, backup, *block_inclusion_objective)
+                            .await?,
+                    ),
                 };
                 let wallet = Wallet::new(wallet_name, key_provider, online_wallet)?;
-                let wallet = Rc::new(RefCell::new(wallet));
-
-                // Auto-feed
-                if !(*no_auto_feed_xpubs
-                    || wallet.as_ref().borrow().key_provider().is_none()
-                    || wallet.as_ref().borrow().online_wallet().is_none())
-                {
-                    (WalletAXpubSubcmd::AutoAdd { count: 20 }).execute(Box::new(wallet.clone()))?;
-                }
                 wallet
             }
             _ => {
@@ -472,13 +465,15 @@ impl super::CommandExecutor for WalletSubcmd {
                             };
                             lk.init_local_key(password)?;
                         }
-                        AnyKeyProvider::Ledger(ledger) => ledger.init_ledger_client()?,
+                        AnyKeyProvider::Ledger(ledger) => ledger.init_ledger_client().await?,
                     };
                 }
                 if need_online_wallet {
                     match wallet.online_wallet_mut() {
                         AnyOnlineWallet::None => (),
-                        AnyOnlineWallet::Service(sb) => sb.init_service_client(service_client)?,
+                        AnyOnlineWallet::Service(sb) => {
+                            sb.init_service_client(service_client).await?
+                        }
                         AnyOnlineWallet::Local(lw) => {
                             lw.init_heritage_wallet(&db)?;
                             if need_blockchain_provider {
@@ -493,15 +488,24 @@ impl super::CommandExecutor for WalletSubcmd {
                         }
                     };
                 }
-                Rc::new(RefCell::new(wallet))
+                wallet
             }
         };
 
-        let wallet_ref = wallet.as_ref();
-
         let res: Box<dyn crate::display::Displayable> = match self {
-            WalletSubcmd::Create { .. } => {
-                wallet_ref.borrow().create(&mut db)?;
+            WalletSubcmd::Create {
+                no_auto_feed_xpubs, ..
+            } => {
+                wallet.create(&mut db)?;
+                // Auto-feed
+                if !(no_auto_feed_xpubs
+                    || wallet.key_provider().is_none()
+                    || wallet.online_wallet().is_none())
+                {
+                    (WalletAXpubSubcmd::AutoAdd { count: 20 })
+                        .execute(Box::new(wallet))
+                        .await?;
+                }
                 Box::new("Wallet created")
             }
             WalletSubcmd::Rename {
@@ -510,7 +514,7 @@ impl super::CommandExecutor for WalletSubcmd {
             } => {
                 // First verify the destination name is free
                 Wallet::verify_name_is_free(&db, &new_name)?;
-                if let AnyOnlineWallet::Service(sb) = wallet.borrow().online_wallet() {
+                if let AnyOnlineWallet::Service(sb) = wallet.online_wallet() {
                     if !local_only {
                         let cmd = subcmd_service_wallet::WalletSubcmd::Update {
                             name: Some(new_name.clone()),
@@ -518,19 +522,22 @@ impl super::CommandExecutor for WalletSubcmd {
                         };
                         cmd.execute(Box::new((
                             sb.wallet_id().to_owned(),
-                            sb.service_client().clone(),
-                        )))?;
+                            sb.service_client()
+                                .ok_or(Error::UninitializedServiceClient)?
+                                .clone(),
+                        )))
+                        .await?;
                     }
                 };
                 // Rename
-                wallet.borrow_mut().db_rename(&mut db, new_name)?;
+                wallet.db_rename(&mut db, new_name)?;
                 Box::new("Wallet renamed")
             }
             WalletSubcmd::Backup {
                 file,
                 overwrite: override_content,
             } => {
-                let backup = wallet.borrow().online_wallet().backup_descriptors()?;
+                let backup = wallet.online_wallet().backup_descriptors().await?;
                 if let Some(path) = file {
                     let mut file = if override_content {
                         std::fs::File::create(path)
@@ -547,12 +554,13 @@ impl super::CommandExecutor for WalletSubcmd {
             }
             WalletSubcmd::Remove => {
                 {
-                    let wallet = wallet_ref.borrow();
                     let wallet_name = wallet.name();
                     if !wallet.key_provider().is_none() && !wallet.key_provider().is_ledger() {
                         if !ask_user_confirmation(&format!(
                             "Do you have a backup of the seed of the wallet \"{wallet_name}\"?"
-                        ))? {
+                        ))
+                        .await?
+                        {
                             return Ok(Box::new("Delete wallet cancelled"));
                         }
                     }
@@ -560,58 +568,64 @@ impl super::CommandExecutor for WalletSubcmd {
                         if !ask_user_confirmation(&format!(
                             "Do you have a backup of the descriptors of \
                             the wallet \"{wallet_name}\"?"
-                        ))? {
+                        ))
+                        .await?
+                        {
                             return Ok(Box::new("Delete wallet cancelled"));
                         }
                     }
                     if !ask_user_confirmation(
                         &"Do you understand that *BOTH* the seed and the descriptors \
                         are necessary to re-access bitcoins in an Heritage wallet?",
-                    )? {
+                    )
+                    .await?
+                    {
                         return Ok(Box::new("Delete wallet cancelled"));
                     }
                     if !ask_user_confirmation(&format!(
                         "FINAL CONFIRMATION. Are you 100% SURE you want to \
                         delete the wallet \"{wallet_name}\"?"
-                    ))? {
+                    ))
+                    .await?
+                    {
                         return Ok(Box::new("Delete wallet cancelled"));
                     }
                 }
-                wallet_ref.borrow_mut().delete(&mut db)?;
+                wallet.delete(&mut db)?;
                 Box::new("Wallet deleted")
             }
-            WalletSubcmd::NewAddress => Box::new(wallet.borrow().online_wallet().get_address()?),
-            WalletSubcmd::Addresses => Box::new(wallet.borrow().online_wallet().list_addresses()?),
+            WalletSubcmd::NewAddress => Box::new(wallet.online_wallet().get_address().await?),
+            WalletSubcmd::Addresses => Box::new(wallet.online_wallet().list_addresses().await?),
             WalletSubcmd::Transactions => {
-                Box::new(wallet.borrow().online_wallet().list_transactions()?)
+                Box::new(wallet.online_wallet().list_transactions().await?)
             }
-            WalletSubcmd::Utxos => Box::new(wallet.borrow().online_wallet().list_heritage_utxos()?),
+            WalletSubcmd::Utxos => Box::new(wallet.online_wallet().list_heritage_utxos().await?),
             WalletSubcmd::LedgerPolicies { subcmd } => {
-                subcmd.execute(Box::new((wallet.clone(), db)))?
+                subcmd.execute(Box::new((wallet, db))).await?
             }
             WalletSubcmd::HeritageConfigs { subcmd } => {
-                subcmd.execute(Box::new((wallet.clone(), db)))?
+                subcmd.execute(Box::new((wallet, db))).await?
             }
-            WalletSubcmd::AccountXpubs { subcmd } => subcmd.execute(Box::new(wallet.clone()))?,
+            WalletSubcmd::AccountXpubs { subcmd } => subcmd.execute(Box::new(wallet)).await?,
             WalletSubcmd::Sync => {
-                wallet.borrow_mut().sync()?;
+                wallet.sync().await?;
                 Box::new("Synchronization done")
             }
-            WalletSubcmd::Balance => Box::new(wallet_ref.borrow().get_wallet_status()?),
+            WalletSubcmd::Balance => Box::new(wallet.get_wallet_status().await?),
             WalletSubcmd::BlockInclusionObjective { set } => {
                 let wallet_status = if let Some(bio) = set {
-                    wallet_ref.borrow_mut().set_block_inclusion_objective(bio)?
+                    wallet.set_block_inclusion_objective(bio).await?
                 } else {
-                    wallet_ref.borrow().get_wallet_status()?
+                    wallet.get_wallet_status().await?
                 };
                 Box::new(wallet_status.block_inclusion_objective)
             }
-            WalletSubcmd::Fingerprint => Box::new(wallet_ref.borrow().fingerprint()?),
+            WalletSubcmd::Fingerprint => Box::new(wallet.fingerprint()?),
             WalletSubcmd::Mnemonic {
                 i_understand_what_i_am_doing: _,
-            } => Box::new(wallet_ref.borrow().backup_mnemonic()?),
+            } => Box::new(wallet.backup_mnemonic().await?),
             WalletSubcmd::HeirConfig { kind } => {
-                Box::new(wallet_ref.borrow().derive_heir_config(kind.into())?)
+                Box::new(wallet.derive_heir_config(kind.into()).await?)
             }
             WalletSubcmd::SendBitcoins {
                 recipient,
@@ -706,14 +720,15 @@ impl super::CommandExecutor for WalletSubcmd {
 
                 let disable_rbf = if disable_rbf { Some(true) } else { None };
 
-                let wallet = wallet_ref.borrow();
                 // Get the PSBT
-                let (psbt, summary) = wallet.create_psbt(NewTx {
-                    spending_config,
-                    fee_policy,
-                    utxo_selection,
-                    disable_rbf,
-                })?;
+                let (psbt, summary) = wallet
+                    .create_psbt(NewTx {
+                        spending_config,
+                        fee_policy,
+                        utxo_selection,
+                        disable_rbf,
+                    })
+                    .await?;
                 SpendFlow::new(psbt, gargs.network)
                     .transaction_summary(&summary)
                     .fingerprints(&get_fingerprints(&db)?)
@@ -729,14 +744,14 @@ impl super::CommandExecutor for WalletSubcmd {
                         None
                     })
                     .set_skip_confirmations(skip_confirmation)
-                    .run()?
+                    .run()
+                    .await?
             }
             WalletSubcmd::SignPsbt {
                 psbt,
                 broadcast,
                 skip_confirmation,
             } => {
-                let wallet = wallet_ref.borrow();
                 SpendFlow::new(psbt, gargs.network)
                     .fingerprints(&get_fingerprints(&db)?)
                     .sign(wallet.key_provider())
@@ -746,12 +761,14 @@ impl super::CommandExecutor for WalletSubcmd {
                     } else {
                         None
                     })
-                    .run()?
+                    .run()
+                    .await?
             }
             WalletSubcmd::BroadcastPsbt { psbt } => {
                 SpendFlow::<AnyKeyProvider, _>::new(psbt, gargs.network)
-                    .broadcast(wallet_ref.borrow().online_wallet())
-                    .run()?
+                    .broadcast(wallet.online_wallet())
+                    .run()
+                    .await?
             }
         };
         Ok(res)

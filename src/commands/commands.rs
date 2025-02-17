@@ -62,8 +62,8 @@ pub enum Command {
 
 #[derive(Debug, clap::Subcommand)]
 pub enum ListAndDefault<
-    T: Clone + core::fmt::Debug + clap::Subcommand + CommandExecutor,
-    I: DatabaseItem,
+    T: Clone + core::fmt::Debug + clap::Subcommand + CommandExecutor + Send,
+    I: DatabaseItem + Send,
 > {
     /// List all items in the database
     List,
@@ -81,8 +81,10 @@ pub enum ListAndDefault<
         _p: core::marker::PhantomData<I>,
     },
 }
-impl<T: Clone + core::fmt::Debug + clap::Subcommand + CommandExecutor, I: DatabaseItem> Clone
-    for ListAndDefault<T, I>
+impl<
+        T: Clone + core::fmt::Debug + clap::Subcommand + CommandExecutor + Send,
+        I: DatabaseItem + Send,
+    > Clone for ListAndDefault<T, I>
 {
     fn clone(&self) -> Self {
         match self {
@@ -96,12 +98,14 @@ impl<T: Clone + core::fmt::Debug + clap::Subcommand + CommandExecutor, I: Databa
     }
 }
 
-impl<T: Clone + core::fmt::Debug + clap::Subcommand + CommandExecutor, I: DatabaseItem>
-    super::CommandExecutor for ListAndDefault<T, I>
+impl<
+        T: Clone + core::fmt::Debug + clap::Subcommand + CommandExecutor + Send,
+        I: DatabaseItem + Send,
+    > super::CommandExecutor for ListAndDefault<T, I>
 {
-    fn execute(
+    async fn execute(
         self,
-        params: Box<dyn Any>,
+        params: Box<dyn Any + Send>,
     ) -> btc_heritage_wallet::errors::Result<Box<dyn crate::display::Displayable>> {
         let (mut db, name, gargs, service_gargs, bcpc): (
             Database,
@@ -124,7 +128,7 @@ impl<T: Clone + core::fmt::Debug + clap::Subcommand + CommandExecutor, I: Databa
             }
             ListAndDefault::Others(sub) => {
                 let params = Box::new((db, name, gargs, service_gargs, bcpc));
-                sub.execute(params)
+                sub.execute(params).await
             }
             ListAndDefault::_Impossible { .. } => unreachable!(),
         }
@@ -132,9 +136,9 @@ impl<T: Clone + core::fmt::Debug + clap::Subcommand + CommandExecutor, I: Databa
 }
 
 impl super::CommandExecutor for Command {
-    fn execute(
+    async fn execute(
         self,
-        params: Box<dyn Any>,
+        params: Box<dyn Any + Send>,
     ) -> btc_heritage_wallet::errors::Result<Box<dyn crate::display::Displayable>> {
         let (gargs, service_gargs, blockchain_provider_gargs): (
             super::CliGlobalArgs,
@@ -157,7 +161,7 @@ impl super::CommandExecutor for Command {
                     None => Wallet::get_default_item_name(&db)?,
                 };
                 let params = Box::new((db, wallet_name, gargs, service_gargs, bcpc));
-                subcmd.execute(params)
+                subcmd.execute(params).await
             }
             Command::Heir { heir_name, subcmd } => {
                 let heir_name = match heir_name {
@@ -165,7 +169,7 @@ impl super::CommandExecutor for Command {
                     None => Heir::get_default_item_name(&db)?,
                 };
                 let params = Box::new((db, heir_name, gargs, service_gargs, bcpc));
-                subcmd.execute(params)
+                subcmd.execute(params).await
             }
             Command::HeirWallet {
                 heir_wallet_name,
@@ -176,11 +180,11 @@ impl super::CommandExecutor for Command {
                     None => HeirWallet::get_default_item_name(&db)?,
                 };
                 let params = Box::new((db, heir_wallet_name, gargs, service_gargs, bcpc));
-                subcmd.execute(params)
+                subcmd.execute(params).await
             }
             Command::Service { subcmd } => {
                 let params = Box::new((db, service_gargs));
-                subcmd.execute(params)
+                subcmd.execute(params).await
             }
             Command::BlockchainProvider { set } => {
                 if set {

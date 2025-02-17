@@ -6,7 +6,8 @@ mod utils;
 use clap::Parser;
 use commands::CliParser;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::Builder::from_env(
         env_logger::Env::default().default_filter_or("error,tracing::span=warn"),
     )
@@ -15,7 +16,7 @@ fn main() {
 
     let cli_parser = CliParser::parse();
     log::debug!("Processing {:?}", cli_parser);
-    match cli_parser.execute() {
+    match cli_parser.execute().await {
         Ok(displayable) => displayable.display(),
         Err(e) => log::error!("{e}"),
     };

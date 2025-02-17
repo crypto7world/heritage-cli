@@ -1,4 +1,4 @@
-use core::{any::Any, cell::RefCell};
+use core::any::Any;
 use std::{collections::HashMap, path::PathBuf};
 
 use btc_heritage_wallet::{
@@ -188,7 +188,10 @@ pub enum HeirWalletSubcmd {
 }
 
 impl super::CommandExecutor for HeirWalletSubcmd {
-    fn execute(mut self, params: Box<dyn Any>) -> Result<Box<dyn crate::display::Displayable>> {
+    async fn execute(
+        mut self,
+        params: Box<dyn Any + Send>,
+    ) -> Result<Box<dyn crate::display::Displayable>> {
         let (mut db, heir_wallet_name, gargs, service_gargs, bcpc): (
             Database,
             String,
@@ -297,15 +300,18 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                         } else {
                             backup.take()
                         };
-                        AnyHeritageProvider::LocalWallet(LocalWallet::create(
-                            fingerprint,
-                            &db,
-                            backup.expect("clap ensure it is present"),
-                        )?)
+                        AnyHeritageProvider::LocalWallet(
+                            LocalWallet::create(
+                                fingerprint,
+                                &db,
+                                backup.expect("clap ensure it is present"),
+                            )
+                            .await?,
+                        )
                     }
                 };
                 let heir = HeirWallet::new(heir_wallet_name, key_provider, heritage_provider)?;
-                let heir = RefCell::new(heir);
+                // let heir = RefCell::new(heir);
 
                 heir
             }
@@ -322,7 +328,7 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                             };
                             lk.init_local_key(password)?;
                         }
-                        AnyKeyProvider::Ledger(ledger) => ledger.init_ledger_client()?,
+                        AnyKeyProvider::Ledger(ledger) => ledger.init_ledger_client().await?,
                     };
                 }
                 if need_heritage_provider {
@@ -343,66 +349,69 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                         }
                     };
                 }
-                RefCell::new(heir)
+                // RefCell::new(heir)
+                heir
             }
         };
 
         let res: Box<dyn crate::display::Displayable> = match self {
             HeirWalletSubcmd::Create { .. } => {
-                heir.borrow().create(&mut db)?;
+                heir.create(&mut db)?;
                 Box::new("Heir wallet created")
             }
             HeirWalletSubcmd::Rename { new_name } => {
                 // First verify the destination name is free
                 HeirWallet::verify_name_is_free(&db, &new_name)?;
                 // Rename
-                heir.borrow_mut().db_rename(&mut db, new_name)?;
+                let mut heir = heir;
+                heir.db_rename(&mut db, new_name)?;
                 Box::new("Heir wallet renamed")
             }
             HeirWalletSubcmd::Remove {
                 i_understand_what_i_am_doing,
             } => {
                 if !i_understand_what_i_am_doing {
-                    if !heir.borrow().key_provider().is_none() {
+                    if !heir.key_provider().is_none() {
                         if !ask_user_confirmation(&format!(
                             "Do you have a backup of the seed of the heir-wallet \"{}\"?",
-                            heir.borrow().name()
-                        ))? {
+                            heir.name()
+                        ))
+                        .await?
+                        {
                             return Ok(Box::new("Delete heir-wallet cancelled"));
                         }
                     }
                     if !ask_user_confirmation(&format!(
                         "FINAL CONFIRMATION. Are you SURE you want to delete the heir-wallet \"{}\"?",
-                        heir.borrow().name()
-                    ))?{
+                        heir.name()
+                    )).await?{
                         return Ok(Box::new("Delete heir-wallet cancelled"));
                     }
                 }
-                heir.borrow().delete(&mut db)?;
+                heir.delete(&mut db)?;
                 Box::new("Heir wallet deleted")
             }
-            HeirWalletSubcmd::Fingerprint => Box::new(heir.borrow().fingerprint()?),
-            HeirWalletSubcmd::Mnemonic => Box::new(heir.borrow().backup_mnemonic()?),
+            HeirWalletSubcmd::Fingerprint => Box::new(heir.fingerprint()?),
+            HeirWalletSubcmd::Mnemonic => Box::new(heir.backup_mnemonic().await?),
             HeirWalletSubcmd::HeirConfig { kind } => Box::new(
-                heir.borrow()
-                    .key_provider()
-                    .derive_heir_config(kind.into())?
+                heir.key_provider()
+                    .derive_heir_config(kind.into())
+                    .await?
                     .clone(),
             ),
             HeirWalletSubcmd::Sync => {
-                let mut heir_ref_mut = heir.borrow_mut();
-                let AnyHeritageProvider::LocalWallet(local_wallet) =
-                    heir_ref_mut.heritage_provider_mut()
+                let mut heir = heir;
+                let AnyHeritageProvider::LocalWallet(local_wallet) = heir.heritage_provider_mut()
                 else {
                     return Err(
                         btc_heritage_wallet::errors::Error::IncorrectHeritageProvider("Local"),
                     );
                 };
-                local_wallet.local_heritage_wallet_mut().sync()?;
+                local_wallet.local_heritage_wallet_mut().sync().await?;
                 Box::new("Synchronization done")
             }
             HeirWalletSubcmd::ListInheritances { immatures, details } => {
-                let heritages = heir.borrow().list_heritages()?;
+                let heritages = heir.list_heritages().await?;
 
                 let heritages = if immatures {
                     // If will want to take immature UTXO into account, just pass the Vec as-is
@@ -455,9 +464,8 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                     .require_network(gargs.network)
                     .map_err(|e| Error::InvalidAddressNetwork(e.to_string()))?;
 
-                let heir = heir.borrow();
                 // Get the PSBT
-                let (psbt, summary) = heir.create_psbt(&id, recipient)?;
+                let (psbt, summary) = heir.create_psbt(&id, recipient).await?;
                 SpendFlow::new(psbt, gargs.network)
                     .fingerprints(&get_fingerprints(&db)?)
                     .transaction_summary(&summary)
@@ -473,14 +481,14 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                     } else {
                         None
                     })
-                    .run()?
+                    .run()
+                    .await?
             }
             HeirWalletSubcmd::SignPsbt {
                 psbt,
                 broadcast,
                 skip_confirmation,
             } => {
-                let heir = heir.borrow();
                 SpendFlow::new(psbt, gargs.network)
                     .fingerprints(&get_fingerprints(&db)?)
                     .sign(heir.key_provider())
@@ -490,12 +498,14 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                     } else {
                         None
                     })
-                    .run()?
+                    .run()
+                    .await?
             }
             HeirWalletSubcmd::BroadcastPsbt { psbt } => {
                 SpendFlow::<AnyKeyProvider, _>::new(psbt, gargs.network)
-                    .broadcast(heir.borrow().heritage_provider())
-                    .run()?
+                    .broadcast(heir.heritage_provider())
+                    .run()
+                    .await?
             }
         };
         Ok(res)

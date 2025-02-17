@@ -112,6 +112,8 @@ Of course you can take steps to do all that on your own, the service is simply h
 
 ## Stability and versioning
 
+Commits between releases SHOULD NOT be considered stable. You should only use tagged releases.
+
 The software provided is working and can be safely used for Bitcoin's holdings.
 
 We are using [Semantic Versioning](https://github.com/semver/semver) (MAJOR.MINOR.PATCH).

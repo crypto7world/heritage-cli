@@ -36,7 +36,10 @@ pub enum ServiceSubcmd {
 }
 
 impl super::CommandExecutor for ServiceSubcmd {
-    fn execute(self, params: Box<dyn Any>) -> Result<Box<dyn crate::display::Displayable>> {
+    async fn execute(
+        self,
+        params: Box<dyn Any + Send>,
+    ) -> Result<Box<dyn crate::display::Displayable>> {
         let (mut db, service_gargs): (Database, super::ServiceGlobalArgs) =
             *params.downcast().unwrap();
 
@@ -47,7 +50,7 @@ impl super::CommandExecutor for ServiceSubcmd {
             ServiceSubcmd::Login => Tokens::new(
                 &service_gargs.auth_url,
                 &service_gargs.auth_client_id,
-                |device_auth_response| {
+                |device_auth_response| async move {
                     let verification_uri_complete = format!(
                         "{}?user_code={}",
                         device_auth_response.verification_uri, device_auth_response.user_code
@@ -68,21 +71,22 @@ impl super::CommandExecutor for ServiceSubcmd {
 
                     Ok(())
                 },
-            )?
+            )
+            .await?
             .save(&mut db)
             .map(|()| Box::new("Login successful"))?,
             ServiceSubcmd::Logout => todo!(),
-            ServiceSubcmd::ListWallets => service_client.list_wallets().map(Box::new)?,
+            ServiceSubcmd::ListWallets => service_client.list_wallets().await.map(Box::new)?,
             ServiceSubcmd::Wallet { wallet_id, subcmd } => {
                 let params = Box::new((wallet_id, service_client));
-                subcmd.execute(params)?
+                subcmd.execute(params).await?
             }
-            ServiceSubcmd::ListHeirs => service_client.list_heirs().map(Box::new)?,
+            ServiceSubcmd::ListHeirs => service_client.list_heirs().await.map(Box::new)?,
             ServiceSubcmd::Heir { heir_id, subcmd } => {
                 let params = Box::new((heir_id, service_client));
-                subcmd.execute(params)?
+                subcmd.execute(params).await?
             }
-            ServiceSubcmd::ListHeritages => service_client.list_heritages().map(Box::new)?,
+            ServiceSubcmd::ListHeritages => service_client.list_heritages().await.map(Box::new)?,
         };
         Ok(res)
     }

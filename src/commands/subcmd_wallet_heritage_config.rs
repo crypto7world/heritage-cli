@@ -1,5 +1,5 @@
-use core::{any::Any, cell::RefCell};
-use std::{collections::HashMap, rc::Rc};
+use core::any::Any;
+use std::collections::HashMap;
 
 use btc_heritage_wallet::{
     btc_heritage::{
@@ -64,13 +64,15 @@ pub struct ManualSpec {
 }
 
 impl super::CommandExecutor for WalletHeritageConfigSubcmd {
-    fn execute(self, params: Box<dyn Any>) -> Result<Box<dyn crate::display::Displayable>> {
-        let (wallet, db): (Rc<RefCell<Wallet>>, Database) = *params.downcast().unwrap();
-        let wallet = wallet.as_ref();
+    async fn execute(
+        self,
+        params: Box<dyn Any + Send>,
+    ) -> Result<Box<dyn crate::display::Displayable>> {
+        let (mut wallet, db): (Wallet, Database) = *params.downcast().unwrap();
         let res: Box<dyn crate::display::Displayable> = match self {
-            WalletHeritageConfigSubcmd::List => Box::new(wallet.borrow().list_heritage_configs()?),
+            WalletHeritageConfigSubcmd::List => Box::new(wallet.list_heritage_configs().await?),
             WalletHeritageConfigSubcmd::ShowCurrent => {
-                let mut hc_list = wallet.borrow().list_heritage_configs()?;
+                let mut hc_list = wallet.list_heritage_configs().await?;
                 if hc_list.len() > 0 {
                     Box::new(hc_list.remove(0))
                 } else {
@@ -122,11 +124,11 @@ impl super::CommandExecutor for WalletHeritageConfigSubcmd {
 
                             let mut service_heirs_index: HashMap<String, HeirConfig> =
                                 if service_heir.len() > 0 {
-                                    if let AnyOnlineWallet::Service(sb) =
-                                        wallet.borrow().online_wallet()
-                                    {
+                                    if let AnyOnlineWallet::Service(sb) = wallet.online_wallet() {
                                         sb.service_client()
-                                            .list_heirs()?
+                                            .ok_or(Error::UninitializedServiceClient)?
+                                            .list_heirs()
+                                            .await?
                                             .into_iter()
                                             .map(|h| (h.display_name, h.heir_config))
                                             .collect()
@@ -193,7 +195,7 @@ impl super::CommandExecutor for WalletHeritageConfigSubcmd {
                 } else {
                     unreachable!("either manual_spec or json must be present")
                 };
-                Box::new(wallet.borrow_mut().set_heritage_config(hc)?)
+                Box::new(wallet.set_heritage_config(hc).await?)
             }
         };
         Ok(res)

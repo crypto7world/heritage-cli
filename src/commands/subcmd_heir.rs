@@ -1,4 +1,4 @@
-use core::{any::Any, cell::RefCell};
+use core::any::Any;
 
 use btc_heritage_wallet::{
     btc_heritage::{AccountXPub, HeirConfig},
@@ -111,7 +111,10 @@ impl From<HeirConfigType> for btc_heritage_wallet::HeirConfigType {
 }
 
 impl super::CommandExecutor for HeirSubcmd {
-    fn execute(mut self, params: Box<dyn Any>) -> Result<Box<dyn crate::display::Displayable>> {
+    async fn execute(
+        mut self,
+        params: Box<dyn Any + Send>,
+    ) -> Result<Box<dyn crate::display::Displayable>> {
         let (mut db, heir_name, gargs, service_gargs, _bcpc): (
             Database,
             String,
@@ -180,7 +183,7 @@ impl super::CommandExecutor for HeirSubcmd {
                         }
                     }
                 } else if !key_provider.is_none() {
-                    key_provider.derive_heir_config((*kind).into())?
+                    key_provider.derive_heir_config((*kind).into()).await?
                 } else {
                     unreachable!("clap ensures it")
                 };
@@ -193,11 +196,12 @@ impl super::CommandExecutor for HeirSubcmd {
                         custom_message.take(),
                         permissions.take(),
                         &service_client,
-                    )?;
+                    )
+                    .await?;
                 }
 
                 let heir = Heir::new(heir_name, heir_config, key_provider);
-                let heir = RefCell::new(heir);
+                // let heir = RefCell::new(heir);
                 heir
             }
             _ => {
@@ -213,45 +217,51 @@ impl super::CommandExecutor for HeirSubcmd {
                             };
                             lk.init_local_key(password)?;
                         }
-                        AnyKeyProvider::Ledger(ledger) => ledger.init_ledger_client()?,
+                        AnyKeyProvider::Ledger(ledger) => ledger.init_ledger_client().await?,
                     };
                 }
-                RefCell::new(heir)
+                // RefCell::new(heir)
+                heir
             }
         };
 
         let res: Box<dyn crate::display::Displayable> = match self {
             HeirSubcmd::Create { .. } => {
-                heir.borrow().create(&mut db)?;
+                heir.create(&mut db)?;
                 Box::new("Heir created")
             }
             HeirSubcmd::Rename { new_name } => {
                 // First verify the destination name is free
                 Heir::verify_name_is_free(&db, &new_name)?;
                 // Rename
-                heir.borrow_mut().db_rename(&mut db, new_name)?;
+                let mut heir = heir;
+                heir.db_rename(&mut db, new_name)?;
                 Box::new("Heir renamed")
             }
             HeirSubcmd::Remove {
                 i_understand_what_i_am_doing,
             } => {
                 if !i_understand_what_i_am_doing {
-                    if !heir.borrow().key_provider().is_none() {
+                    if !heir.key_provider().is_none() {
                         if !ask_user_confirmation(&format!(
                             "Do you have a backup of the seed of the heir \"{}\"?",
-                            heir.borrow().name()
-                        ))? {
+                            heir.name()
+                        ))
+                        .await?
+                        {
                             return Ok(Box::new("Delete heir-wallet cancelled"));
                         }
                     }
                     if !ask_user_confirmation(&format!(
                         "FINAL CONFIRMATION. Are you SURE you want to delete the heir \"{}\"?",
-                        heir.borrow().name()
-                    ))? {
+                        heir.name()
+                    ))
+                    .await?
+                    {
                         return Ok(Box::new("Delete heir-wallet cancelled"));
                     }
                 }
-                heir.borrow().delete(&mut db)?;
+                heir.delete(&mut db)?;
                 Box::new("Heir deleted")
             }
             HeirSubcmd::Export {
@@ -259,26 +269,26 @@ impl super::CommandExecutor for HeirSubcmd {
                 custom_message,
                 permissions,
             } => {
-                let h = heir.borrow();
                 create_heir_in_service(
-                    h.name().to_owned(),
-                    h.heir_config.clone(),
+                    heir.name().to_owned(),
+                    heir.heir_config.clone(),
                     email,
                     custom_message,
                     permissions,
                     &service_client,
-                )?;
+                )
+                .await?;
                 Box::new("Heir exported")
             }
-            HeirSubcmd::Fingerprint => Box::new(heir.borrow().fingerprint()?),
-            HeirSubcmd::Mnemonic => Box::new(heir.borrow().backup_mnemonic()?),
-            HeirSubcmd::HeirConfig => Box::new(heir.into_inner().heir_config),
+            HeirSubcmd::Fingerprint => Box::new(heir.fingerprint()?),
+            HeirSubcmd::Mnemonic => Box::new(heir.backup_mnemonic().await?),
+            HeirSubcmd::HeirConfig => Box::new(heir.heir_config),
         };
         Ok(res)
     }
 }
 
-fn create_heir_in_service(
+async fn create_heir_in_service(
     display_name: String,
     heir_config: HeirConfig,
     mut emails: Vec<String>,
@@ -302,19 +312,21 @@ fn create_heir_in_service(
             .map(|vhp| HeirPermissions::from(vhp.into_iter().map(|cli_hp| cli_hp.into())))
             .unwrap_or(HeirPermissions::from([HeirPermission::OwnerEmail])),
     };
-    let h = service_client.post_heirs(heir_create)?;
+    let h = service_client.post_heirs(heir_create).await?;
     if emails.len() > 0 {
-        service_client.post_heir_contacts(
-            &h.id,
-            emails
-                .into_iter()
-                .map(|c| {
-                    Ok(HeirContact::Email {
-                        email: EmailAddress::try_from(c).map_err(|e| Error::Generic(e))?,
+        service_client
+            .post_heir_contacts(
+                &h.id,
+                emails
+                    .into_iter()
+                    .map(|c| {
+                        Ok(HeirContact::Email {
+                            email: EmailAddress::try_from(c).map_err(|e| Error::Generic(e))?,
+                        })
                     })
-                })
-                .collect::<Result<_>>()?,
-        )?;
+                    .collect::<Result<_>>()?,
+            )
+            .await?;
     }
     Ok(())
 }

@@ -1,10 +1,8 @@
-use core::{any::Any, cell::RefCell};
-use std::rc::Rc;
-
 use btc_heritage_wallet::{
     btc_heritage::AccountXPub, errors::Result, heritage_service_api_client::AccountXPubWithStatus,
     KeyProvider, OnlineWallet, Wallet,
 };
+use core::any::Any;
 
 /// Wallet Account XPubs management subcommand.
 #[derive(Debug, Clone, clap::Subcommand)]
@@ -42,12 +40,14 @@ pub enum WalletAXpubSubcmd {
 }
 
 impl super::CommandExecutor for WalletAXpubSubcmd {
-    fn execute(self, params: Box<dyn Any>) -> Result<Box<dyn crate::display::Displayable>> {
-        let wallet: Rc<RefCell<Wallet>> = *params.downcast().unwrap();
-        let wallet = wallet.as_ref();
+    async fn execute(
+        self,
+        params: Box<dyn Any + Send>,
+    ) -> Result<Box<dyn crate::display::Displayable>> {
+        let mut wallet: Wallet = *params.downcast().unwrap();
         let res: Box<dyn crate::display::Displayable> = match self {
             WalletAXpubSubcmd::ListAdded { used, unused } => {
-                let mut res = wallet.borrow().list_account_xpubs()?;
+                let mut res = wallet.list_account_xpubs().await?;
                 if !used {
                     res.retain(|e| {
                         match e {
@@ -69,14 +69,14 @@ impl super::CommandExecutor for WalletAXpubSubcmd {
                 Box::new(res)
             }
             WalletAXpubSubcmd::Generate { start, end } => {
-                Box::new(wallet.borrow().derive_accounts_xpubs(start..end)?)
+                Box::new(wallet.derive_accounts_xpubs(start..end).await?)
             }
             WalletAXpubSubcmd::Add { account_xpubs } => {
-                wallet.borrow_mut().feed_account_xpubs(account_xpubs)?;
+                wallet.feed_account_xpubs(account_xpubs).await?;
                 Box::new(())
             }
             WalletAXpubSubcmd::AutoAdd { count } => {
-                let axpubs = wallet.borrow().list_account_xpubs()?;
+                let axpubs = wallet.list_account_xpubs().await?;
                 let (unused_count, last_seen_index) =
                     axpubs
                         .iter()
@@ -90,8 +90,8 @@ impl super::CommandExecutor for WalletAXpubSubcmd {
                         });
                 let start = last_seen_index.map(|lsi| lsi + 1).unwrap_or(0);
                 let end = start + (count.checked_sub(unused_count).unwrap_or(0)) as u32;
-                let account_xpubs = wallet.borrow().derive_accounts_xpubs(start..end)?;
-                wallet.borrow_mut().feed_account_xpubs(account_xpubs)?;
+                let account_xpubs = wallet.derive_accounts_xpubs(start..end).await?;
+                wallet.feed_account_xpubs(account_xpubs).await?;
                 Box::new(())
             }
         };

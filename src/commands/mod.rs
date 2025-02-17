@@ -18,8 +18,10 @@ use btc_heritage_wallet::bitcoin::Network;
 pub trait CommandExecutor {
     fn execute(
         self,
-        params: Box<dyn Any>,
-    ) -> btc_heritage_wallet::errors::Result<Box<dyn crate::display::Displayable>>;
+        params: Box<dyn Any + Send>,
+    ) -> impl std::future::Future<
+        Output = btc_heritage_wallet::errors::Result<Box<dyn crate::display::Displayable>>,
+    > + Send;
 }
 
 #[derive(Clone, Debug, clap::Args)]
@@ -96,7 +98,7 @@ pub struct CliParser {
 }
 
 impl CliParser {
-    pub fn execute(
+    pub async fn execute(
         self,
     ) -> btc_heritage_wallet::errors::Result<Box<dyn crate::display::Displayable>> {
         let cmd = self.cmd;
@@ -105,7 +107,7 @@ impl CliParser {
             self.service_gargs,
             self.blockchain_provider_gargs,
         ));
-        cmd.execute(params)
+        cmd.execute(params).await
     }
 }
 

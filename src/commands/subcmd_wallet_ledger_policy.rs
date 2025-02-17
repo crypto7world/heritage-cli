@@ -1,5 +1,5 @@
-use core::{any::Any, cell::RefCell};
-use std::{collections::HashSet, rc::Rc};
+use core::any::Any;
+use std::collections::HashSet;
 
 use btc_heritage_wallet::{
     errors::Result, ledger::WalletPolicy, Database, DatabaseItem, LedgerPolicy, OnlineWallet,
@@ -26,23 +26,24 @@ pub enum WalletLedgerPolicySubcmd {
 }
 
 impl super::CommandExecutor for WalletLedgerPolicySubcmd {
-    fn execute(self, params: Box<dyn Any>) -> Result<Box<dyn crate::display::Displayable>> {
-        let (wallet, mut db): (Rc<RefCell<Wallet>>, Database) = *params.downcast().unwrap();
-        let wallet = wallet.as_ref();
+    async fn execute(
+        self,
+        params: Box<dyn Any + Send>,
+    ) -> Result<Box<dyn crate::display::Displayable>> {
+        let (mut wallet, mut db): (Wallet, Database) = *params.downcast().unwrap();
         let res: Box<dyn crate::display::Displayable> = match self {
             WalletLedgerPolicySubcmd::List => Box::new(
                 wallet
-                    .borrow()
                     .online_wallet()
-                    .backup_descriptors()?
+                    .backup_descriptors()
+                    .await?
                     .into_iter()
                     .filter_map(|d| TryInto::<LedgerPolicy>::try_into(d).ok())
                     .collect::<Vec<_>>(),
             ),
             WalletLedgerPolicySubcmd::ListRegistered => {
-                let wallet_ref = wallet.borrow();
                 let btc_heritage_wallet::AnyKeyProvider::Ledger(ledger_wallet) =
-                    wallet_ref.key_provider()
+                    wallet.key_provider()
                 else {
                     return Err(btc_heritage_wallet::errors::Error::IncorrectKeyProvider(
                         "Ledger",
@@ -52,20 +53,22 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
             }
             WalletLedgerPolicySubcmd::Register { policies } => {
                 let count = if let btc_heritage_wallet::AnyKeyProvider::Ledger(ledger_wallet) =
-                    wallet.borrow_mut().key_provider_mut()
+                    wallet.key_provider_mut()
                 {
-                    ledger_wallet.register_policies(&policies, display_wallet_policy)?
+                    ledger_wallet
+                        .register_policies(&policies, display_wallet_policy)
+                        .await?
                 } else {
                     return Err(btc_heritage_wallet::errors::Error::IncorrectKeyProvider(
                         "Ledger",
                     ));
                 };
-                wallet.borrow().save(&mut db)?;
+                wallet.save(&mut db)?;
                 Box::new(format!("{count} policies registered"))
             }
             WalletLedgerPolicySubcmd::AutoRegister => {
                 let policies = if let btc_heritage_wallet::AnyKeyProvider::Ledger(ledger_wallet) =
-                    wallet.borrow().key_provider()
+                    wallet.key_provider()
                 {
                     let registered_policy_ids = ledger_wallet
                         .list_registered_policies()
@@ -73,9 +76,9 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                         .map(|(id, ..)| id)
                         .collect::<HashSet<_>>();
                     wallet
-                        .borrow()
                         .online_wallet()
-                        .backup_descriptors()?
+                        .backup_descriptors()
+                        .await?
                         .into_iter()
                         .enumerate()
                         .filter_map(|(i, d)| {
@@ -97,13 +100,15 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                 };
                 log::info!("{} new policies to register", policies.len());
                 let count = if let btc_heritage_wallet::AnyKeyProvider::Ledger(ledger_wallet) =
-                    wallet.borrow_mut().key_provider_mut()
+                    wallet.key_provider_mut()
                 {
-                    ledger_wallet.register_policies(&policies, display_wallet_policy)?
+                    ledger_wallet
+                        .register_policies(&policies, display_wallet_policy)
+                        .await?
                 } else {
                     unreachable!("already confirmed it is a Ledger")
                 };
-                wallet.borrow().save(&mut db)?;
+                wallet.save(&mut db)?;
                 Box::new(format!("{count} new policies registered"))
             }
         };

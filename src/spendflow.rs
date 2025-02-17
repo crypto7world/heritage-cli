@@ -77,7 +77,7 @@ impl<'a, KP: KeyProvider, B: Broadcaster> SpendFlow<'a, KP, B> {
         self.skip_confirmation = true;
         self
     }
-    pub fn run(mut self) -> Result<Box<dyn crate::display::Displayable>> {
+    pub async fn run(mut self) -> Result<Box<dyn crate::display::Displayable>> {
         log::debug!("Starting SpendFlow::run");
 
         let display = self.display_stage;
@@ -93,13 +93,13 @@ impl<'a, KP: KeyProvider, B: Broadcaster> SpendFlow<'a, KP, B> {
             self.display_summary()?;
         };
 
-        if confirm_sign && !self.confirm_before_sign()? {
+        if confirm_sign && !self.confirm_before_sign().await? {
             log::warn!("Signing refused");
             return Ok(Box::new(self.psbt.to_string()));
         };
 
         if sign {
-            match self.run_sign() {
+            match self.run_sign().await {
                 Ok(_) => (),
                 Err(e) => {
                     log::error!("Signing errored: {e}");
@@ -113,14 +113,14 @@ impl<'a, KP: KeyProvider, B: Broadcaster> SpendFlow<'a, KP, B> {
             self.display_summary()?;
         };
 
-        if confirm_broadcast && !self.confirm_before_broadcast()? {
+        if confirm_broadcast && !self.confirm_before_broadcast().await? {
             log::warn!("Broadcast refused");
             return Ok(Box::new(self.psbt.to_string()));
         };
 
         let result = if broadcast {
             let psbt = self.psbt.clone();
-            let tx_id = match self.run_broadcast() {
+            let tx_id = match self.run_broadcast().await {
                 Ok(tx_id) => tx_id,
                 Err(e) => {
                     log::error!("Broadcasting errored: {e}");
@@ -153,10 +153,10 @@ impl<'a, KP: KeyProvider, B: Broadcaster> SpendFlow<'a, KP, B> {
         }
         Ok(())
     }
-    fn confirm_before_sign(&self) -> Result<bool> {
-        Ok(ask_user_confirmation("Do you want to sign this PSBT?")?)
+    async fn confirm_before_sign(&self) -> Result<bool> {
+        Ok(ask_user_confirmation("Do you want to sign this PSBT?").await?)
     }
-    fn run_sign(&mut self) -> Result<()> {
+    async fn run_sign(&mut self) -> Result<()> {
         log::debug!("{}", serde_json::to_string_pretty(&self.psbt)?);
         log::info!("Signing the PSBT...");
         // Sign it
@@ -164,21 +164,20 @@ impl<'a, KP: KeyProvider, B: Broadcaster> SpendFlow<'a, KP, B> {
             .sign_stage
             .as_ref()
             .unwrap()
-            .sign_psbt(&mut self.psbt)?;
+            .sign_psbt(&mut self.psbt)
+            .await?;
         log::info!("Signed {signed_input_count} input(s)");
         log::debug!("{}", serde_json::to_string_pretty(&self.psbt)?);
         Ok(())
     }
-    fn confirm_before_broadcast(&self) -> Result<bool> {
-        Ok(ask_user_confirmation(
-            "Do you want to broadcast this PSBT?",
-        )?)
+    async fn confirm_before_broadcast(&self) -> Result<bool> {
+        Ok(ask_user_confirmation("Do you want to broadcast this PSBT?").await?)
     }
-    fn run_broadcast(self) -> Result<Txid> {
+    async fn run_broadcast(self) -> Result<Txid> {
         log::debug!("{}", serde_json::to_string_pretty(&self.psbt)?);
         log::info!("Broadcasting the PSBT...");
         // Broadcast it
-        let tx_id = self.broadcast_stage.unwrap().broadcast(self.psbt)?;
+        let tx_id = self.broadcast_stage.unwrap().broadcast(self.psbt).await?;
         log::info!("Transaction ID: {tx_id}");
         Ok(tx_id)
     }

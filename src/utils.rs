@@ -13,18 +13,23 @@ use btc_heritage_wallet::{
 use chrono::{DateTime, Utc};
 use serde::Serializer;
 
-pub fn ask_user_confirmation(prompt: &str) -> Result<bool> {
+pub async fn ask_user_confirmation(prompt: &str) -> Result<bool> {
     print!("{prompt} Answer \"yes\" or \"no\" (default \"no\"): ");
     stdout().flush().map_err(|e| {
         log::error!("Could not display the confirmation prompt: {e}");
         Error::generic(e)
     })?;
 
-    let mut s = String::new();
-    stdin().read_line(&mut s).map_err(|e| {
-        log::error!("Not a correct string: {e}");
-        Error::generic(e)
-    })?;
+    let mut s = tokio::task::spawn_blocking(|| {
+        let mut s = String::new();
+        stdin().read_line(&mut s).map_err(|e| {
+            log::error!("Not a correct string: {e}");
+            Error::generic(e)
+        })?;
+        Ok::<_, Error>(s)
+    })
+    .await
+    .unwrap()?;
 
     // Remove the final \r\n, if present
     if let Some('\n') = s.chars().next_back() {

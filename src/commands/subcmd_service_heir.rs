@@ -38,12 +38,15 @@ pub enum HeirSubcmd {
 }
 
 impl super::CommandExecutor for HeirSubcmd {
-    fn execute(self, params: Box<dyn Any>) -> Result<Box<dyn crate::display::Displayable>> {
+    async fn execute(
+        self,
+        params: Box<dyn Any + Send>,
+    ) -> Result<Box<dyn crate::display::Displayable>> {
         let (heir_id, service_client): (String, HeritageServiceClient) =
             *params.downcast().unwrap();
 
         let res: Box<dyn crate::display::Displayable> = match self {
-            HeirSubcmd::Get => Box::new(service_client.get_heir(&heir_id)?),
+            HeirSubcmd::Get => Box::new(service_client.get_heir(&heir_id).await?),
             HeirSubcmd::Update {
                 name,
                 email,
@@ -57,7 +60,7 @@ impl super::CommandExecutor for HeirSubcmd {
                 let main_contact_change = custom_message_change || email_change;
 
                 let main_contact = if main_contact_change {
-                    let current_heir = service_client.get_heir(&heir_id)?;
+                    let current_heir = service_client.get_heir(&heir_id).await?;
                     Some(MainContact {
                         email: email
                             .map(|s| EmailAddress::try_from(s))
@@ -85,33 +88,39 @@ impl super::CommandExecutor for HeirSubcmd {
                     main_contact,
                     permissions,
                 };
-                Box::new(service_client.patch_heir(&heir_id, heir_update)?)
+                Box::new(service_client.patch_heir(&heir_id, heir_update).await?)
             }
             HeirSubcmd::AddContacts { contacts } => Box::new(
-                service_client.post_heir_contacts(
-                    &heir_id,
-                    contacts
-                        .into_iter()
-                        .map(|c| {
-                            Ok(HeirContact::Email {
-                                email: EmailAddress::try_from(c).map_err(|e| Error::Generic(e))?,
+                service_client
+                    .post_heir_contacts(
+                        &heir_id,
+                        contacts
+                            .into_iter()
+                            .map(|c| {
+                                Ok(HeirContact::Email {
+                                    email: EmailAddress::try_from(c)
+                                        .map_err(|e| Error::Generic(e))?,
+                                })
                             })
-                        })
-                        .collect::<Result<_>>()?,
-                )?,
+                            .collect::<Result<_>>()?,
+                    )
+                    .await?,
             ),
             HeirSubcmd::RemoveContacts { contacts } => Box::new(
-                service_client.delete_heir_contacts(
-                    &heir_id,
-                    contacts
-                        .into_iter()
-                        .map(|c| {
-                            Ok(HeirContact::Email {
-                                email: EmailAddress::try_from(c).map_err(|e| Error::Generic(e))?,
+                service_client
+                    .delete_heir_contacts(
+                        &heir_id,
+                        contacts
+                            .into_iter()
+                            .map(|c| {
+                                Ok(HeirContact::Email {
+                                    email: EmailAddress::try_from(c)
+                                        .map_err(|e| Error::Generic(e))?,
+                                })
                             })
-                        })
-                        .collect::<Result<_>>()?,
-                )?,
+                            .collect::<Result<_>>()?,
+                    )
+                    .await?,
             ),
         };
         Ok(res)
