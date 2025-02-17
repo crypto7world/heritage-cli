@@ -334,7 +334,7 @@ heritage-cli wallet broadcast $signed
 
 ## Minimum Supported Rust Version (MSRV)
 
-This binary compile with Rust 1.79.0
+This binary compile with Rust 1.81.0
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
