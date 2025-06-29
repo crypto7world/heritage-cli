@@ -1,12 +1,13 @@
 use core::any::Any;
 
 use btc_heritage_wallet::{
-    btc_heritage::{AccountXPub, HeirConfig},
+    btc_heritage::{utils::bitcoin_network, AccountXPub, HeirConfig},
     errors::{Error, Result},
     heritage_service_api_client::{
         EmailAddress, HeirContact, HeirCreate, HeirPermission, HeirPermissions,
-        HeritageServiceClient, MainContact, Tokens,
+        HeritageServiceClient, HeritageServiceConfig, MainContact,
     },
+    online_wallet::BlockchainProviderConfig,
     AnyKeyProvider, BoundFingerprint, Database, DatabaseItem, Heir, KeyProvider, Language,
     LocalKey, Mnemonic,
 };
@@ -115,16 +116,15 @@ impl super::CommandExecutor for HeirSubcmd {
         mut self,
         params: Box<dyn Any + Send>,
     ) -> Result<Box<dyn crate::display::Displayable>> {
-        let (mut db, heir_name, gargs, service_gargs, _bcpc): (
+        let (mut db, heir_name, hsc, _bcpc): (
             Database,
             String,
-            super::CliGlobalArgs,
-            super::ServiceGlobalArgs,
-            super::gargs_blockchain_provider::BlockchainProviderConfig,
+            HeritageServiceConfig,
+            BlockchainProviderConfig,
         ) = *params.downcast().unwrap();
 
-        let service_client =
-            HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&mut db).await?);
+        let service_client = HeritageServiceClient::from(hsc);
+        service_client.load_tokens_from_cache(&db).await?;
 
         let need_key_provider = match &self {
             HeirSubcmd::Create { .. } | HeirSubcmd::Mnemonic { .. } => true,
@@ -148,7 +148,7 @@ impl super::CommandExecutor for HeirSubcmd {
                 custom_message,
                 permissions,
             } => {
-                Heir::verify_name_is_free(&db, &heir_name).await?;
+                Heir::verify_name_is_free(&db, &heir_name)?;
                 let key_provider = match key_provider {
                     KeyProviderType::None => AnyKeyProvider::None,
                     KeyProviderType::Local => {
@@ -164,10 +164,10 @@ impl super::CommandExecutor for HeirSubcmd {
                                     log::error!("invalid mnemonic {e}");
                                     Error::Generic(format!("invalid mnemonic {e}"))
                                 })?;
-                            LocalKey::restore(mnemo, password, gargs.network)
+                            LocalKey::restore(mnemo, password, bitcoin_network::get())
                         } else {
                             log::info!("Generating a new heir...");
-                            LocalKey::generate(*word_count, password, gargs.network)
+                            LocalKey::generate(*word_count, password, bitcoin_network::get())
                         };
                         AnyKeyProvider::LocalKey(local_key)
                     }
@@ -205,7 +205,7 @@ impl super::CommandExecutor for HeirSubcmd {
                 heir
             }
             _ => {
-                let mut heir = Heir::load(&db, &heir_name).await?;
+                let mut heir = Heir::load(&db, &heir_name)?;
                 if need_key_provider {
                     match heir.key_provider_mut() {
                         AnyKeyProvider::None => (),
@@ -217,7 +217,7 @@ impl super::CommandExecutor for HeirSubcmd {
                             };
                             lk.init_local_key(password)?;
                         }
-                        AnyKeyProvider::Ledger(ledger) => ledger.init_ledger_client().await?,
+                        AnyKeyProvider::Ledger(_) => (),
                     };
                 }
                 // RefCell::new(heir)
@@ -227,15 +227,15 @@ impl super::CommandExecutor for HeirSubcmd {
 
         let res: Box<dyn crate::display::Displayable> = match self {
             HeirSubcmd::Create { .. } => {
-                heir.create(&mut db).await?;
+                heir.create(&mut db)?;
                 Box::new("Heir created")
             }
             HeirSubcmd::Rename { new_name } => {
                 // First verify the destination name is free
-                Heir::verify_name_is_free(&db, &new_name).await?;
+                Heir::verify_name_is_free(&db, &new_name)?;
                 // Rename
                 let mut heir = heir;
-                heir.db_rename(&mut db, new_name).await?;
+                heir.db_rename(&mut db, new_name)?;
                 Box::new("Heir renamed")
             }
             HeirSubcmd::Remove {
@@ -261,7 +261,7 @@ impl super::CommandExecutor for HeirSubcmd {
                         return Ok(Box::new("Delete heir-wallet cancelled"));
                     }
                 }
-                heir.delete(&mut db).await?;
+                heir.delete(&mut db)?;
                 Box::new("Heir deleted")
             }
             HeirSubcmd::Export {
@@ -295,7 +295,7 @@ async fn create_heir_in_service(
     custom_message: Option<String>,
     permissions: Option<Vec<CliHeirPermission>>,
     service_client: &HeritageServiceClient,
-) -> Result<()> {
+) -> Result<btc_heritage_wallet::heritage_service_api_client::Heir> {
     log::debug!(
         "create_heir - display_name={display_name} heir_config={heir_config:?} \
     emails={emails:?} custom_message={} permissions={permissions:?}",
@@ -328,5 +328,5 @@ async fn create_heir_in_service(
             )
             .await?;
     }
-    Ok(())
+    Ok(h)
 }

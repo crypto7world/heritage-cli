@@ -2,8 +2,8 @@ use core::any::Any;
 
 use btc_heritage_wallet::{
     errors::Result,
-    heritage_service_api_client::{HeritageServiceClient, Tokens},
-    Database,
+    heritage_service_api_client::{HeritageServiceClient, HeritageServiceConfig},
+    Database, DatabaseSingleItem,
 };
 
 /// Commands related purely to the Heritage service
@@ -33,6 +33,12 @@ pub enum ServiceSubcmd {
     },
     /// List the Heritages that you are - or will be - eligible to in Heritage service, if any
     ListHeritages,
+    /// Display the current Heritage Service configuration options
+    Config {
+        /// Set the default values using the current Heritage Service configuration options instead of just displaying them
+        #[arg(long, default_value_t = false)]
+        set: bool,
+    },
 }
 
 impl super::CommandExecutor for ServiceSubcmd {
@@ -40,42 +46,49 @@ impl super::CommandExecutor for ServiceSubcmd {
         self,
         params: Box<dyn Any + Send>,
     ) -> Result<Box<dyn crate::display::Displayable>> {
-        let (mut db, service_gargs): (Database, super::ServiceGlobalArgs) =
-            *params.downcast().unwrap();
+        let (mut db, hsc): (Database, HeritageServiceConfig) = *params.downcast().unwrap();
 
-        let service_client =
-            HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&db).await?);
+        match &self {
+            ServiceSubcmd::Config { set } => {
+                if *set {
+                    hsc.save(&mut db)?
+                }
+                return Ok(Box::new(hsc));
+            }
+            _ => (),
+        }
+
+        let service_client = HeritageServiceClient::from(hsc);
+        service_client.load_tokens_from_cache(&db).await?;
 
         let res: Box<dyn crate::display::Displayable> = match self {
-            ServiceSubcmd::Login => Tokens::new(
-                &service_gargs.auth_url,
-                &service_gargs.auth_client_id,
-                |device_auth_response| async move {
-                    let verification_uri_complete = format!(
-                        "{}?user_code={}",
-                        device_auth_response.verification_uri, device_auth_response.user_code
-                    );
+            ServiceSubcmd::Login => {
+                service_client
+                    .login(|device_auth_response| async move {
+                        let verification_uri_complete = format!(
+                            "{}?user_code={}",
+                            device_auth_response.verification_uri, device_auth_response.user_code
+                        );
 
-                    let human_formated_code = format!(
-                        "{}-{}",
-                        &device_auth_response.user_code[..4],
-                        &device_auth_response.user_code[4..]
-                    );
+                        let human_formated_code = format!(
+                            "{}-{}",
+                            &device_auth_response.user_code[..4],
+                            &device_auth_response.user_code[4..]
+                        );
 
-                    println!("Go to {verification_uri_complete} to approve the connection");
-                    println!();
-                    println!("Verify that the code displayed is: {human_formated_code}");
-                    println!();
+                        println!("Go to {verification_uri_complete} to approve the connection");
+                        println!();
+                        println!("Verify that the code displayed is: {human_formated_code}");
+                        println!();
 
-                    _ = open::that(verification_uri_complete);
+                        _ = open::that(verification_uri_complete);
 
-                    Ok(())
-                },
-            )
-            .await?
-            .save(&mut db)
-            .await
-            .map(|()| Box::new("Login successful"))?,
+                        Ok(())
+                    })
+                    .await?;
+                service_client.persist_tokens_in_cache(&mut db).await?;
+                Box::new("Login successful")
+            }
             ServiceSubcmd::Logout => todo!(),
             ServiceSubcmd::ListWallets => service_client.list_wallets().await.map(Box::new)?,
             ServiceSubcmd::Wallet { wallet_id, subcmd } => {
@@ -88,6 +101,7 @@ impl super::CommandExecutor for ServiceSubcmd {
                 subcmd.execute(params).await?
             }
             ServiceSubcmd::ListHeritages => service_client.list_heritages().await.map(Box::new)?,
+            ServiceSubcmd::Config { .. } => unreachable!("Already processed"),
         };
         Ok(res)
     }

@@ -5,7 +5,7 @@ use btc_heritage_wallet::{
     },
     heritage_service_api_client::{
         AccountXPubWithStatus, Fingerprint, Heir, Heritage, HeritageUtxo, HeritageWalletMeta,
-        TransactionSummary,
+        SubwalletConfigMeta, TransactionSummary,
     },
     key_provider::MnemonicBackup,
     ledger::WalletPolicy,
@@ -43,6 +43,7 @@ macro_rules! str_display {
 str_display!(&str);
 str_display!(String);
 str_display!(Fingerprint);
+str_display!(WalletAddress);
 str_display!(Vec<String>);
 str_display!(Vec<AccountXPub>);
 str_display!(Vec<WalletAddress>);
@@ -72,6 +73,7 @@ serde_display!(Heir);
 serde_display!(HeritageWalletMeta);
 serde_display!(Heritage);
 serde_display!(HeritageConfig);
+serde_display!(SubwalletConfigMeta);
 serde_display!(AccountXPubWithStatus);
 serde_display!(WalletStatus);
 serde_display!(TransactionSummary);
