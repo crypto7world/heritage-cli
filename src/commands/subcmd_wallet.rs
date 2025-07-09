@@ -5,7 +5,7 @@ use btc_heritage_wallet::{
     bitcoin::{
         address::NetworkUnchecked, bip32::Fingerprint, psbt::Psbt, Address, Amount, OutPoint,
     },
-    btc_heritage::{utils::bitcoin_network, HeritageWalletBackup},
+    btc_heritage::{utils::bitcoin_network, BlockInclusionObjective, HeritageWalletBackup},
     errors::{Error, Result},
     heritage_service_api_client::{
         HeritageServiceClient, HeritageServiceConfig, NewTx, NewTxDrainTo, NewTxFeePolicy,
@@ -15,7 +15,7 @@ use btc_heritage_wallet::{
     AnyKeyProvider, AnyOnlineWallet, BoundFingerprint, Database, DatabaseItem, KeyProvider,
     Language, LedgerKey, LocalKey, Mnemonic, OnlineWallet, Wallet,
 };
-use clap::builder::{PossibleValuesParser, RangedU64ValueParser, TypedValueParser};
+use clap::builder::{PossibleValuesParser, TypedValueParser};
 
 use crate::{
     commands::{subcmd_heir::HeirConfigType, subcmd_service_wallet},
@@ -105,8 +105,8 @@ pub enum WalletSubcmd {
         #[arg(long, visible_alias = "no-auto", default_value_t = false)]
         no_auto_feed_xpubs: bool,
         /// Set the Block Inclusion Objective of the wallet. It is used to compute the fee when creating a new transaction.
-        #[arg(long, visible_alias = "bio", value_parser=RangedU64ValueParser::<u16>::new().range(1..=1008), default_value = "6")]
-        block_inclusion_objective: u16,
+        #[arg(long, visible_alias = "bio", default_value_t = BlockInclusionObjective::default())]
+        block_inclusion_objective: BlockInclusionObjective,
     },
     /// Rename the wallet in the database to a new name
     Rename {
@@ -164,8 +164,8 @@ pub enum WalletSubcmd {
     #[command(visible_alias = "bio")]
     BlockInclusionObjective {
         /// Set the Block Inclusion Objective of the wallet instead of showing it.
-        #[arg(long, value_parser=RangedU64ValueParser::<u16>::new().range(1..=1008))]
-        set: Option<u16>,
+        #[arg(long)]
+        set: Option<BlockInclusionObjective>,
     },
     /// Display the fingerprint of the wallet
     Fingerprint,
