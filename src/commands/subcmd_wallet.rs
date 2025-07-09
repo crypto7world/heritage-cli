@@ -474,7 +474,8 @@ impl super::CommandExecutor for WalletSubcmd {
                         AnyKeyProvider::Ledger(_) => (),
                     };
                 }
-                if need_online_wallet {
+                // Also initialize if we need to re-attempt fingerprint control
+                if need_online_wallet || !wallet.fingerprints_controlled() {
                     match wallet.online_wallet_mut() {
                         AnyOnlineWallet::None => (),
                         AnyOnlineWallet::Service(sb) => {
@@ -487,6 +488,11 @@ impl super::CommandExecutor for WalletSubcmd {
                             }
                         }
                     };
+                }
+
+                if wallet.retry_fingerprints_control().await? {
+                    // If it returned true, then an update was made, need to save.
+                    wallet.save(&mut db)?;
                 }
                 wallet
             }
