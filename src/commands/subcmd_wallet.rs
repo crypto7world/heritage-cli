@@ -482,7 +482,7 @@ impl super::CommandExecutor for WalletSubcmd {
                             sb.init_service_client(service_client).await?
                         }
                         AnyOnlineWallet::Local(lw) => {
-                            lw.init_heritage_wallet(db.clone())?;
+                            lw.init_heritage_wallet(db.clone()).await?;
                             if need_blockchain_provider {
                                 lw.init_blockchain_factory(bcpc.try_into().map_err(Error::generic)?)
                             }

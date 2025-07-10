@@ -409,7 +409,8 @@ impl super::CommandExecutor for HeirWalletSubcmd {
                         AnyHeritageProvider::Service(sb) => sb.init_service_client(service_client),
                         AnyHeritageProvider::LocalWallet(lw) => {
                             lw.local_heritage_wallet_mut()
-                                .init_heritage_wallet(db.clone())?;
+                                .init_heritage_wallet(db.clone())
+                                .await?;
                             if need_blockchain_provider {
                                 lw.local_heritage_wallet_mut().init_blockchain_factory(
                                     bcpc.try_into().map_err(Error::generic)?,
