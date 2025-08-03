@@ -138,7 +138,7 @@ impl From<Heritage> for Inheritance {
 pub enum HeritageProviderType {
     /// No heritage provider, the resulting wallet will not be able to list heritages (it will be sign-only)
     None,
-    /// Use the Heritage service as the online wallet
+    /// Use the Heritage service as the heritage provider
     Service,
     /// Use a local wallet restored from descriptors backup
     Local,

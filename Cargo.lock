@@ -267,7 +267,7 @@ checksum = "8f68f53c83ab957f72c32642f3868eec03eb974d1fb82e453128456482613d36"
 
 [[package]]
 name = "btc-heritage"
-version = "0.25.0"
+version = "0.27.0"
 dependencies = [
  "bdk",
  "log",
@@ -279,7 +279,7 @@ dependencies = [
 
 [[package]]
 name = "btc-heritage-wallet"
-version = "0.25.0"
+version = "0.27.0"
 dependencies = [
  "bip39",
  "bitcoin 0.31.2",
@@ -605,7 +605,7 @@ dependencies = [
 
 [[package]]
 name = "heritage-service-api-client"
-version = "0.25.0"
+version = "0.27.0"
 dependencies = [
  "btc-heritage",
  "log",

@@ -1,7 +1,7 @@
 use core::any::Any;
 
 use btc_heritage_wallet::{
-    btc_heritage::{utils::bitcoin_network, AccountXPub, HeirConfig},
+    btc_heritage::{utils::bitcoin_network, HeirConfig},
     errors::{Error, Result},
     heritage_service_api_client::{
         EmailAddress, HeirContact, HeirCreate, HeirPermission, HeirPermissions,
@@ -178,9 +178,7 @@ impl super::CommandExecutor for HeirSubcmd {
                         // HeirConfigType::SinglePub => HeirConfig::SingleHeirPubkey(
                         //     SingleHeirPubkey::try_from(heir_config.as_str())?,
                         // ),
-                        HeirConfigType::Xpub => {
-                            HeirConfig::HeirXPubkey(AccountXPub::try_from(heir_config.as_str())?)
-                        }
+                        HeirConfigType::Xpub => HeirConfig::HeirXPubkey(heir_config.parse()?),
                     }
                 } else if !key_provider.is_none() {
                     key_provider.derive_heir_config((*kind).into()).await?
@@ -306,7 +304,7 @@ async fn create_heir_in_service(
         heir_config,
         main_contact: MainContact {
             email: EmailAddress::try_from(emails.remove(0)).map_err(|e| Error::Generic(e))?,
-            custom_message: custom_message,
+            custom_message,
         },
         permissions: permissions
             .map(|vhp| HeirPermissions::from(vhp.into_iter().map(|cli_hp| cli_hp.into())))
