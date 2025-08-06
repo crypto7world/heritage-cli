@@ -70,9 +70,9 @@ impl super::CommandExecutor for WalletHeritageConfigSubcmd {
     ) -> Result<Box<dyn crate::display::Displayable>> {
         let (mut wallet, db): (Wallet, Database) = *params.downcast().unwrap();
         let res: Box<dyn crate::display::Displayable> = match self {
-            WalletHeritageConfigSubcmd::List => Box::new(wallet.list_heritage_configs().await?),
+            WalletHeritageConfigSubcmd::List => Box::new(wallet.list_subwallet_configs().await?),
             WalletHeritageConfigSubcmd::ShowCurrent => {
-                let mut hc_list = wallet.list_heritage_configs().await?;
+                let mut hc_list = wallet.list_subwallet_configs().await?;
                 if hc_list.len() > 0 {
                     Box::new(hc_list.remove(0))
                 } else {
@@ -114,8 +114,7 @@ impl super::CommandExecutor for WalletHeritageConfigSubcmd {
 
                             let mut local_heirs_index: HashMap<String, HeirConfig> =
                                 if local_heir.len() > 0 {
-                                    Heir::all_in_db(&db)
-                                        .await?
+                                    Heir::all_in_db(&db)?
                                         .into_iter()
                                         .map(|h| (h.name, h.heir_config))
                                         .collect()

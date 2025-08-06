@@ -5,17 +5,17 @@ use btc_heritage_wallet::{
     bitcoin::{
         address::NetworkUnchecked, bip32::Fingerprint, psbt::Psbt, Address, Amount, OutPoint,
     },
-    btc_heritage::HeritageWalletBackup,
+    btc_heritage::{utils::bitcoin_network, BlockInclusionObjective, HeritageWalletBackup},
     errors::{Error, Result},
     heritage_service_api_client::{
-        HeritageServiceClient, NewTx, NewTxDrainTo, NewTxFeePolicy, NewTxRecipient,
-        NewTxSpendingConfig, NewTxUtxoSelection, Tokens,
+        HeritageServiceClient, HeritageServiceConfig, NewTx, NewTxDrainTo, NewTxFeePolicy,
+        NewTxRecipient, NewTxSpendingConfig, NewTxUtxoSelection,
     },
-    online_wallet::{LocalHeritageWallet, ServiceBinding},
+    online_wallet::{BlockchainProviderConfig, LocalHeritageWallet, ServiceBinding},
     AnyKeyProvider, AnyOnlineWallet, BoundFingerprint, Database, DatabaseItem, KeyProvider,
     Language, LedgerKey, LocalKey, Mnemonic, OnlineWallet, Wallet,
 };
-use clap::builder::{PossibleValuesParser, RangedU64ValueParser, TypedValueParser};
+use clap::builder::{PossibleValuesParser, TypedValueParser};
 
 use crate::{
     commands::{subcmd_heir::HeirConfigType, subcmd_service_wallet},
@@ -24,7 +24,6 @@ use crate::{
 };
 
 use super::{
-    gargs_blockchain_provider::BlockchainProviderConfigWithNetwork,
     subcmd_wallet_axpubs::WalletAXpubSubcmd, subcmd_wallet_ledger_policy::WalletLedgerPolicySubcmd,
 };
 
@@ -106,8 +105,8 @@ pub enum WalletSubcmd {
         #[arg(long, visible_alias = "no-auto", default_value_t = false)]
         no_auto_feed_xpubs: bool,
         /// Set the Block Inclusion Objective of the wallet. It is used to compute the fee when creating a new transaction.
-        #[arg(long, visible_alias = "bio", value_parser=RangedU64ValueParser::<u16>::new().range(1..=1008), default_value = "6")]
-        block_inclusion_objective: u16,
+        #[arg(long, visible_alias = "bio", default_value_t = BlockInclusionObjective::default())]
+        block_inclusion_objective: BlockInclusionObjective,
     },
     /// Rename the wallet in the database to a new name
     Rename {
@@ -165,8 +164,8 @@ pub enum WalletSubcmd {
     #[command(visible_alias = "bio")]
     BlockInclusionObjective {
         /// Set the Block Inclusion Objective of the wallet instead of showing it.
-        #[arg(long, value_parser=RangedU64ValueParser::<u16>::new().range(1..=1008))]
-        set: Option<u16>,
+        #[arg(long)]
+        set: Option<BlockInclusionObjective>,
     },
     /// Display the fingerprint of the wallet
     Fingerprint,
@@ -284,16 +283,15 @@ impl super::CommandExecutor for WalletSubcmd {
         mut self,
         params: Box<dyn Any + Send>,
     ) -> Result<Box<dyn crate::display::Displayable>> {
-        let (mut db, wallet_name, gargs, service_gargs, bcpc): (
+        let (mut db, wallet_name, hsc, bcpc): (
             Database,
             String,
-            super::CliGlobalArgs,
-            super::ServiceGlobalArgs,
-            super::gargs_blockchain_provider::BlockchainProviderConfig,
+            HeritageServiceConfig,
+            BlockchainProviderConfig,
         ) = *params.downcast().unwrap();
 
-        let service_client =
-            HeritageServiceClient::new(service_gargs.service_api_url, Tokens::load(&db).await?);
+        let service_client = HeritageServiceClient::from(hsc);
+        service_client.load_tokens_from_cache(&db).await?;
 
         let need_online_wallet = match &self {
             WalletSubcmd::Create { .. }
@@ -381,7 +379,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 block_inclusion_objective,
                 ..
             } => {
-                Wallet::verify_name_is_free(&db, &wallet_name).await?;
+                Wallet::verify_name_is_free(&db, &wallet_name)?;
                 let backup = if let Some(backup_file) = backup_file {
                     Some(crate::utils::parse_heritage_wallet_backup(
                         &std::fs::read_to_string(backup_file.as_path()).map_err(Error::generic)?,
@@ -404,56 +402,64 @@ impl super::CommandExecutor for WalletSubcmd {
                                     log::error!("invalid mnemonic {e}");
                                     Error::Generic(format!("invalid mnemonic {e}"))
                                 })?;
-                            LocalKey::restore(mnemo, password, gargs.network)
+                            LocalKey::restore(mnemo, password, bitcoin_network::get())
                         } else if let Some(word_count) = word_count {
                             log::info!("Generating a new wallet...");
-                            LocalKey::generate(*word_count, password, gargs.network)
+                            LocalKey::generate(*word_count, password, bitcoin_network::get())
                         } else {
                             unreachable!("Clap ensure either seed or word_count is passed");
                         };
                         AnyKeyProvider::LocalKey(local_key)
                     }
                     KeyProviderType::Ledger => {
-                        AnyKeyProvider::Ledger(LedgerKey::new(gargs.network).await?)
+                        AnyKeyProvider::Ledger(LedgerKey::new(bitcoin_network::get()).await?)
                     }
                 };
-                let online_wallet = match online_wallet {
-                    OnlineWalletType::None => AnyOnlineWallet::None,
-                    OnlineWalletType::Service => AnyOnlineWallet::Service(
-                        if let Some(wallet_name) = existing_service_wallet_name {
-                            ServiceBinding::bind_by_name(wallet_name, service_client, gargs.network)
+                let online_wallet =
+                    match online_wallet {
+                        OnlineWalletType::None => AnyOnlineWallet::None,
+                        OnlineWalletType::Service => AnyOnlineWallet::Service(
+                            if let Some(wallet_name) = existing_service_wallet_name {
+                                ServiceBinding::bind_by_name(
+                                    wallet_name,
+                                    service_client,
+                                    bitcoin_network::get(),
+                                )
                                 .await?
-                        } else if let Some(fingerprint) = existing_service_wallet_fingerprint {
-                            ServiceBinding::bind_by_fingerprint(
-                                *fingerprint,
-                                service_client,
-                                gargs.network,
-                            )
-                            .await?
-                        } else if let Some(wallet_id) = existing_service_wallet_id {
-                            ServiceBinding::bind_by_id(&wallet_id, service_client, gargs.network)
+                            } else if let Some(fingerprint) = existing_service_wallet_fingerprint {
+                                ServiceBinding::bind_by_fingerprint(
+                                    *fingerprint,
+                                    service_client,
+                                    bitcoin_network::get(),
+                                )
                                 .await?
-                        } else {
-                            ServiceBinding::create(
-                                &wallet_name,
-                                backup,
-                                *block_inclusion_objective,
-                                service_client,
-                                gargs.network,
-                            )
-                            .await?
-                        },
-                    ),
-                    OnlineWalletType::Local => AnyOnlineWallet::Local(
-                        LocalHeritageWallet::create(&db, backup, *block_inclusion_objective)
-                            .await?,
-                    ),
-                };
+                            } else if let Some(wallet_id) = existing_service_wallet_id {
+                                ServiceBinding::bind_by_id(
+                                    &wallet_id,
+                                    service_client,
+                                    bitcoin_network::get(),
+                                )
+                                .await?
+                            } else {
+                                ServiceBinding::create(
+                                    &wallet_name,
+                                    backup,
+                                    *block_inclusion_objective,
+                                    service_client,
+                                    bitcoin_network::get(),
+                                )
+                                .await?
+                            },
+                        ),
+                        OnlineWalletType::Local => AnyOnlineWallet::Local(
+                            LocalHeritageWallet::create(&db, backup, *block_inclusion_objective)?,
+                        ),
+                    };
                 let wallet = Wallet::new(wallet_name, key_provider, online_wallet)?;
                 wallet
             }
             _ => {
-                let mut wallet = Wallet::load(&db, &wallet_name).await?;
+                let mut wallet = Wallet::load(&db, &wallet_name)?;
                 if need_key_provider {
                     match wallet.key_provider_mut() {
                         AnyKeyProvider::None => (),
@@ -465,28 +471,28 @@ impl super::CommandExecutor for WalletSubcmd {
                             };
                             lk.init_local_key(password)?;
                         }
-                        AnyKeyProvider::Ledger(ledger) => ledger.init_ledger_client().await?,
+                        AnyKeyProvider::Ledger(_) => (),
                     };
                 }
-                if need_online_wallet {
+                // Also initialize if we need to re-attempt fingerprint control
+                if need_online_wallet || !wallet.fingerprints_controlled() {
                     match wallet.online_wallet_mut() {
                         AnyOnlineWallet::None => (),
                         AnyOnlineWallet::Service(sb) => {
                             sb.init_service_client(service_client).await?
                         }
                         AnyOnlineWallet::Local(lw) => {
-                            lw.init_heritage_wallet(&db).await?;
+                            lw.init_heritage_wallet(db.clone()).await?;
                             if need_blockchain_provider {
-                                let bcpc_with_network = BlockchainProviderConfigWithNetwork {
-                                    bcpc,
-                                    network: gargs.network,
-                                };
-                                lw.init_blockchain_factory(
-                                    bcpc_with_network.try_into().map_err(Error::generic)?,
-                                )?
+                                lw.init_blockchain_factory(bcpc.try_into().map_err(Error::generic)?)
                             }
                         }
                     };
+                }
+
+                if wallet.retry_fingerprints_control().await? {
+                    // If it returned true, then an update was made, need to save.
+                    wallet.save(&mut db)?;
                 }
                 wallet
             }
@@ -496,7 +502,7 @@ impl super::CommandExecutor for WalletSubcmd {
             WalletSubcmd::Create {
                 no_auto_feed_xpubs, ..
             } => {
-                wallet.create(&mut db).await?;
+                wallet.create(&mut db)?;
                 // Auto-feed
                 if !(no_auto_feed_xpubs
                     || wallet.key_provider().is_none()
@@ -513,7 +519,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 local_only,
             } => {
                 // First verify the destination name is free
-                Wallet::verify_name_is_free(&db, &new_name).await?;
+                Wallet::verify_name_is_free(&db, &new_name)?;
                 if let AnyOnlineWallet::Service(sb) = wallet.online_wallet() {
                     if !local_only {
                         let cmd = subcmd_service_wallet::WalletSubcmd::Update {
@@ -530,7 +536,7 @@ impl super::CommandExecutor for WalletSubcmd {
                     }
                 };
                 // Rename
-                wallet.db_rename(&mut db, new_name).await?;
+                wallet.db_rename(&mut db, new_name)?;
                 Box::new("Wallet renamed")
             }
             WalletSubcmd::Backup {
@@ -591,7 +597,7 @@ impl super::CommandExecutor for WalletSubcmd {
                         return Ok(Box::new("Delete wallet cancelled"));
                     }
                 }
-                wallet.delete(&mut db).await?;
+                wallet.delete(&mut db)?;
                 Box::new("Wallet deleted")
             }
             WalletSubcmd::NewAddress => Box::new(wallet.online_wallet().get_address().await?),
@@ -644,7 +650,7 @@ impl super::CommandExecutor for WalletSubcmd {
                     .into_iter()
                     .map(|(ad, am)| {
                         Ok((
-                            ad.require_network(gargs.network)
+                            ad.require_network(bitcoin_network::get())
                                 .map_err(|e| Error::InvalidAddressNetwork(e.to_string()))?,
                             am,
                         ))
@@ -729,7 +735,7 @@ impl super::CommandExecutor for WalletSubcmd {
                         disable_rbf,
                     })
                     .await?;
-                SpendFlow::new(psbt, gargs.network)
+                SpendFlow::new(psbt, bitcoin_network::get())
                     .transaction_summary(&summary)
                     .fingerprints(&get_fingerprints(&db).await?)
                     .display()
@@ -752,7 +758,7 @@ impl super::CommandExecutor for WalletSubcmd {
                 broadcast,
                 skip_confirmation,
             } => {
-                SpendFlow::new(psbt, gargs.network)
+                SpendFlow::new(psbt, bitcoin_network::get())
                     .fingerprints(&get_fingerprints(&db).await?)
                     .sign(wallet.key_provider())
                     .set_skip_confirmations(skip_confirmation)
@@ -765,7 +771,7 @@ impl super::CommandExecutor for WalletSubcmd {
                     .await?
             }
             WalletSubcmd::BroadcastPsbt { psbt } => {
-                SpendFlow::<AnyKeyProvider, _>::new(psbt, gargs.network)
+                SpendFlow::<AnyKeyProvider, _>::new(psbt, bitcoin_network::get())
                     .broadcast(wallet.online_wallet())
                     .run()
                     .await?

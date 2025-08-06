@@ -1,14 +1,6 @@
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
-use btc_heritage_wallet::{
-    bitcoin::Network,
-    btc_heritage::{
-        bdk_types::{Auth, ElectrumBlockchain, RpcBlockchainFactory},
-        electrum_client,
-    },
-    online_wallet::AnyBlockchainFactory,
-};
-use serde::{Deserialize, Serialize};
+use btc_heritage_wallet::online_wallet::{AuthConfig, BlockchainProviderConfig};
 
 use crate::display::SerdeDisplay;
 
@@ -21,7 +13,7 @@ pub struct BlockchainProviderGlobalArgs {
         group = "provider",
         global = true
     )]
-    pub electrum_uri: Option<String>,
+    pub electrum_uri: Option<Arc<str>>,
     /// Set the Bitcoin Core server RPC endpoint URL to use when broadcasting a transaction or synchronizing a local wallet.
     #[arg(
         long,
@@ -30,7 +22,7 @@ pub struct BlockchainProviderGlobalArgs {
         group = "provider",
         global = true
     )]
-    pub bitcoincore_url: Option<String>,
+    pub bitcoincore_url: Option<Arc<str>>,
     /// Use the specified cookie-file to authenticate with Bitcoin Core.
     #[arg(
         long,
@@ -39,7 +31,7 @@ pub struct BlockchainProviderGlobalArgs {
         group = "auth",
         global = true
     )]
-    pub auth_cookie: Option<PathBuf>,
+    pub auth_cookie: Option<Arc<str>>,
     /// Use the specified username to authenticate with Bitcoin Core.
     #[arg(
         long,
@@ -48,7 +40,7 @@ pub struct BlockchainProviderGlobalArgs {
         requires = "password",
         global = true
     )]
-    pub username: Option<String>,
+    pub username: Option<Arc<str>>,
     /// Use the specified password to authenticate with Bitcoin Core.
     #[arg(
         long,
@@ -56,32 +48,10 @@ pub struct BlockchainProviderGlobalArgs {
         requires = "username",
         global = true
     )]
-    pub password: Option<String>,
-}
-
-pub struct BlockchainProviderConfigWithNetwork {
-    pub bcpc: BlockchainProviderConfig,
-    pub network: Network,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum BlockchainProviderConfig {
-    BitcoinCore { url: String, auth: Auth },
-    Electrum { url: String },
+    pub password: Option<Arc<str>>,
 }
 
 impl SerdeDisplay for BlockchainProviderConfig {}
-
-impl Default for BlockchainProviderConfig {
-    fn default() -> Self {
-        let mut file: PathBuf = dirs_next::home_dir().unwrap_or_default();
-        file.push(".bitcoin/.cookie");
-        Self::BitcoinCore {
-            url: "http://localhost:8332".to_owned(),
-            auth: Auth::Cookie { file },
-        }
-    }
-}
 
 impl TryFrom<BlockchainProviderGlobalArgs> for BlockchainProviderConfig {
     type Error = Self;
@@ -91,9 +61,9 @@ impl TryFrom<BlockchainProviderGlobalArgs> for BlockchainProviderConfig {
             Ok(Self::Electrum { url })
         } else if let Some(url) = value.bitcoincore_url {
             let auth = if let Some(file) = value.auth_cookie {
-                Auth::Cookie { file }
+                AuthConfig::Cookie { file }
             } else {
-                Auth::UserPass {
+                AuthConfig::UserPass {
                     username: value.username.expect("clap ensures it is present"),
                     password: value.password.expect("clap ensures it is present"),
                 }
@@ -102,34 +72,5 @@ impl TryFrom<BlockchainProviderGlobalArgs> for BlockchainProviderConfig {
         } else {
             Err(Self::default())
         }
-    }
-}
-
-impl TryFrom<BlockchainProviderConfigWithNetwork> for AnyBlockchainFactory {
-    type Error = String;
-
-    fn try_from(value: BlockchainProviderConfigWithNetwork) -> Result<Self, Self::Error> {
-        let BlockchainProviderConfigWithNetwork { bcpc, network } = value;
-        Ok(match bcpc {
-            BlockchainProviderConfig::BitcoinCore { url, auth } => {
-                AnyBlockchainFactory::Bitcoin(RpcBlockchainFactory {
-                    url,
-                    auth,
-                    network,
-                    wallet_name_prefix: None,
-                    default_skip_blocks: 0,
-                    sync_params: None,
-                })
-            }
-            BlockchainProviderConfig::Electrum { url } => {
-                let config = electrum_client::ConfigBuilder::new()
-                    .retry(3)
-                    .timeout(Some(60))
-                    .build();
-                let client = electrum_client::Client::from_config(&url, config)
-                    .map_err(|e| e.to_string())?;
-                AnyBlockchainFactory::Electrum(Arc::new(ElectrumBlockchain::from(client)))
-            }
-        })
     }
 }

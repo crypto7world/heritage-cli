@@ -1,12 +1,14 @@
 use core::any::Any;
 
 use btc_heritage_wallet::{
-    bitcoin::psbt::Psbt, Database, DatabaseItem, Heir, HeirWallet, PsbtSummary, Wallet,
+    bitcoin::psbt::Psbt, btc_heritage::utils::bitcoin_network,
+    heritage_service_api_client::HeritageServiceConfig, online_wallet::BlockchainProviderConfig,
+    Database, DatabaseItem, DatabaseSingleItem, Heir, HeirWallet, PsbtSummary, Wallet,
 };
 
 use crate::utils::get_fingerprints;
 
-use super::{gargs_blockchain_provider::BlockchainProviderConfig, CommandExecutor};
+use super::CommandExecutor;
 
 /// Top level cli sub-commands.
 #[derive(Debug, Clone, clap::Subcommand)]
@@ -48,7 +50,7 @@ pub enum Command {
     /// Show or set the default blockchain provider to use when synchronizing or broadcasting from a local wallet.
     #[command(visible_aliases = ["bp", "blockchain"], aliases = ["default-blockchain", "default-blockchain-provider"])]
     BlockchainProvider {
-        /// Set the default values using the current Blockchain Provider options instead of just displaying them
+        /// Set the default values using the current Blockchain Provider configuration options instead of just displaying them
         #[arg(long, default_value_t = false)]
         set: bool,
     },
@@ -107,27 +109,26 @@ impl<
         self,
         params: Box<dyn Any + Send>,
     ) -> btc_heritage_wallet::errors::Result<Box<dyn crate::display::Displayable>> {
-        let (mut db, name, gargs, service_gargs, bcpc): (
+        let (mut db, name, hsc, bcpc): (
             Database,
             String,
-            super::CliGlobalArgs,
-            super::ServiceGlobalArgs,
-            super::gargs_blockchain_provider::BlockchainProviderConfig,
+            HeritageServiceConfig,
+            BlockchainProviderConfig,
         ) = *params.downcast().unwrap();
 
         match self {
             ListAndDefault::List => {
-                let wallet_names = I::list_names(&db).await?;
+                let wallet_names = I::list_names(&db)?;
                 Ok(Box::new(wallet_names))
             }
             ListAndDefault::DefaultName { new_name } => {
                 if let Some(new_name) = new_name {
-                    I::set_default_item_name(&mut db, new_name).await?;
+                    I::set_default_item_name(&mut db, new_name)?;
                 }
-                Ok(Box::new(I::get_default_item_name(&db).await?))
+                Ok(Box::new(I::get_default_item_name(&db)?))
             }
             ListAndDefault::Others(sub) => {
-                let params = Box::new((db, name, gargs, service_gargs, bcpc));
+                let params = Box::new((db, name, hsc, bcpc));
                 sub.execute(params).await
             }
             ListAndDefault::_Impossible { .. } => unreachable!(),
@@ -142,15 +143,29 @@ impl super::CommandExecutor for Command {
     ) -> btc_heritage_wallet::errors::Result<Box<dyn crate::display::Displayable>> {
         let (gargs, service_gargs, blockchain_provider_gargs): (
             super::CliGlobalArgs,
-            super::ServiceGlobalArgs,
+            super::gargs_heritage_service::HeritageServiceGlobalArgs,
             super::gargs_blockchain_provider::BlockchainProviderGlobalArgs,
         ) = *params.downcast().unwrap();
-        let mut db = Database::new(&gargs.datadir, gargs.network).await?;
-        const DEFAULT_BCPC_KEY: &'static str = "default_bcpc";
+
+        bitcoin_network::set(gargs.network);
+        let mut db = Database::new(&gargs.datadir, gargs.network)?;
+
         let bcpc = match BlockchainProviderConfig::try_from(blockchain_provider_gargs) {
             Ok(bcpc) => bcpc,
-            Err(bcpc) => db.get_item(DEFAULT_BCPC_KEY).await?.unwrap_or(bcpc),
+            Err(bcpc) => BlockchainProviderConfig::load(&db).unwrap_or(bcpc),
         };
+
+        let mut hsc = HeritageServiceConfig::load(&db).unwrap_or_default();
+        if let Some(service_api_url) = service_gargs.service_api_url {
+            hsc.service_api_url = service_api_url;
+        }
+        if let Some(auth_url) = service_gargs.auth_url {
+            hsc.auth_url = auth_url;
+        }
+        if let Some(auth_client_id) = service_gargs.auth_client_id {
+            hsc.auth_client_id = auth_client_id;
+        }
+
         match self {
             Command::Wallet {
                 wallet_name,
@@ -158,17 +173,17 @@ impl super::CommandExecutor for Command {
             } => {
                 let wallet_name = match wallet_name {
                     Some(wn) => wn,
-                    None => Wallet::get_default_item_name(&db).await?,
+                    None => Wallet::get_default_item_name(&db)?,
                 };
-                let params = Box::new((db, wallet_name, gargs, service_gargs, bcpc));
+                let params = Box::new((db, wallet_name, hsc, bcpc));
                 subcmd.execute(params).await
             }
             Command::Heir { heir_name, subcmd } => {
                 let heir_name = match heir_name {
                     Some(wn) => wn,
-                    None => Heir::get_default_item_name(&db).await?,
+                    None => Heir::get_default_item_name(&db)?,
                 };
-                let params = Box::new((db, heir_name, gargs, service_gargs, bcpc));
+                let params = Box::new((db, heir_name, hsc, bcpc));
                 subcmd.execute(params).await
             }
             Command::HeirWallet {
@@ -177,25 +192,27 @@ impl super::CommandExecutor for Command {
             } => {
                 let heir_wallet_name = match heir_wallet_name {
                     Some(wn) => wn,
-                    None => HeirWallet::get_default_item_name(&db).await?,
+                    None => HeirWallet::get_default_item_name(&db)?,
                 };
-                let params = Box::new((db, heir_wallet_name, gargs, service_gargs, bcpc));
+                let params = Box::new((db, heir_wallet_name, hsc, bcpc));
                 subcmd.execute(params).await
             }
             Command::Service { subcmd } => {
-                let params = Box::new((db, service_gargs));
+                let params = Box::new((db, hsc));
                 subcmd.execute(params).await
             }
             Command::BlockchainProvider { set } => {
                 if set {
-                    db.update_item(DEFAULT_BCPC_KEY, &bcpc).await?;
+                    bcpc.save(&mut db)?;
                 }
                 Ok(Box::new(bcpc))
             }
             Command::DisplayPsbt { psbt } => {
-                let network = gargs.network;
-                let summary =
-                    PsbtSummary::try_from((&psbt, &get_fingerprints(&db).await?, network))?;
+                let summary = PsbtSummary::try_from((
+                    &psbt,
+                    &get_fingerprints(&db).await?,
+                    bitcoin_network::get(),
+                ))?;
                 Ok(Box::new(summary))
             }
         }

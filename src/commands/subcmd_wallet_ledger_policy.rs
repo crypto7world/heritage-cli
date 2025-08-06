@@ -37,8 +37,9 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                     .online_wallet()
                     .backup_descriptors()
                     .await?
-                    .into_iter()
-                    .filter_map(|d| TryInto::<LedgerPolicy>::try_into(d).ok())
+                    .iter()
+                    .map(LedgerPolicy::try_from)
+                    .filter_map(Result::ok)
                     .collect::<Vec<_>>(),
             ),
             WalletLedgerPolicySubcmd::ListRegistered => {
@@ -63,7 +64,7 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                         "Ledger",
                     ));
                 };
-                wallet.save(&mut db).await?;
+                wallet.save(&mut db)?;
                 Box::new(format!("{count} policies registered"))
             }
             WalletLedgerPolicySubcmd::AutoRegister => {
@@ -79,10 +80,10 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                         .online_wallet()
                         .backup_descriptors()
                         .await?
-                        .into_iter()
+                        .iter()
                         .enumerate()
                         .filter_map(|(i, d)| {
-                            TryInto::<LedgerPolicy>::try_into(d)
+                            LedgerPolicy::try_from(d)
                                 .map_err(|e| {
                                     log::warn!(
                                     "Cannot convert Descriptor Backup #{i} into a LedgerPolicy: {e}"
@@ -108,7 +109,7 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                 } else {
                     unreachable!("already confirmed it is a Ledger")
                 };
-                wallet.save(&mut db).await?;
+                wallet.save(&mut db)?;
                 Box::new(format!("{count} new policies registered"))
             }
         };

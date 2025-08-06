@@ -1,5 +1,6 @@
 mod commands;
 mod gargs_blockchain_provider;
+mod gargs_heritage_service;
 mod subcmd_heir;
 mod subcmd_heirwallet;
 mod subcmd_service;
@@ -43,40 +44,6 @@ pub struct CliGlobalArgs {
     )]
     pub datadir: DataDir,
 }
-
-#[derive(Clone, Debug, clap::Args)]
-pub struct ServiceGlobalArgs {
-    /// Set the URL of the Heritage service API.
-    #[arg(
-        long,
-        value_hint = clap::ValueHint::Url,
-        env="HERITAGE_SERVICE_API_URL",
-        default_value = "https://api.btcherit.com/v1",
-        global = true,
-        hide = true,
-    )]
-    pub service_api_url: String,
-    /// Set the URL of the Heritage service OAUTH token endpoint for the CLI.
-    #[arg(
-        long,
-        value_hint = clap::ValueHint::Url,
-        env="HERITAGE_AUTH_URL",
-        default_value = "https://device.crypto7.world/token",
-        global = true,
-        hide = true,
-    )]
-    pub auth_url: String,
-    /// Set the OAUTH Client Id of the CLI for the Heritage service authentication endpoint.
-    #[arg(
-        long,
-        env = "HERITAGE_AUTH_CLIENT_ID",
-        default_value = "cda6031ca00d09d66c2b632448eb8fef",
-        global = true,
-        hide = true
-    )]
-    pub auth_client_id: String,
-}
-
 #[derive(Clone, Debug, clap::Parser)]
 /// The Heritage Wallet CLI
 ///
@@ -87,11 +54,12 @@ pub struct CliParser {
     #[clap(next_help_heading = Some("Global options"))]
     #[command(flatten)]
     pub gargs: CliGlobalArgs,
-    #[clap(next_help_heading = Some("Blockchain Provider options"))]
+    #[clap(next_help_heading = Some("Blockchain Provider Configuration"))]
     #[command(flatten)]
     pub blockchain_provider_gargs: gargs_blockchain_provider::BlockchainProviderGlobalArgs,
+    #[clap(next_help_heading = Some("Heritage Service Configuration"))]
     #[command(flatten)]
-    pub service_gargs: ServiceGlobalArgs,
+    pub service_gargs: gargs_heritage_service::HeritageServiceGlobalArgs,
     #[command(subcommand)]
     /// Top level cli sub-commands.
     pub cmd: commands::Command,
