@@ -267,7 +267,8 @@ checksum = "8f68f53c83ab957f72c32642f3868eec03eb974d1fb82e453128456482613d36"
 
 [[package]]
 name = "btc-heritage"
-version = "0.27.0"
+version = "0.27.1"
+source = "git+https://github.com/crypto7world/btc-heritage.git?tag=v0.27.1#44f7c431904fcb8efd9e08c15213376b1c9c04d4"
 dependencies = [
  "bdk",
  "log",
@@ -279,7 +280,8 @@ dependencies = [
 
 [[package]]
 name = "btc-heritage-wallet"
-version = "0.27.0"
+version = "0.27.1"
+source = "git+https://github.com/crypto7world/btc-heritage.git?tag=v0.27.1#44f7c431904fcb8efd9e08c15213376b1c9c04d4"
 dependencies = [
  "bip39",
  "bitcoin 0.31.2",
@@ -605,7 +607,8 @@ dependencies = [
 
 [[package]]
 name = "heritage-service-api-client"
-version = "0.27.0"
+version = "0.27.1"
+source = "git+https://github.com/crypto7world/btc-heritage.git?tag=v0.27.1#44f7c431904fcb8efd9e08c15213376b1c9c04d4"
 dependencies = [
  "btc-heritage",
  "log",
