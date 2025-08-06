@@ -36,7 +36,7 @@ jobs:
             runner: macos-latest
             target: x86_64-apple-darwin
           - arch: x86_64-windows
-            runner: windows-2019
+            runner: windows-2022
             target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.runner }}
