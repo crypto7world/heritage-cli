@@ -72,6 +72,14 @@ pub enum HeirSubcmd {
         /// Confirm that you know what you are doing and skips verification prompts
         i_understand_what_i_am_doing: bool,
     },
+    /// Remove the mnemonic seed from the database
+    /// {n}/!\ BE AWARE THAT YOU WILL NOT BE ABLE TO RETRIEVE IT IF IT IS NOT BACKED-UP /!\
+    #[command(visible_aliases = ["delete-mnemonic", "delete-seed", "remove-seed"])]
+    RemoveMnemonic {
+        #[arg(long)]
+        /// Confirm that you know what you are doing and skips verification prompts
+        i_understand_what_i_am_doing: bool,
+    },
     /// Try to create the heir on the Heritage service. Will fail if the heir already exist.
     /// To manage an existing heir, use the "service heir <...>" command familly
     Export {
@@ -132,7 +140,8 @@ impl super::CommandExecutor for HeirSubcmd {
             | HeirSubcmd::HeirConfig { .. }
             | HeirSubcmd::Remove { .. }
             | HeirSubcmd::Export { .. }
-            | HeirSubcmd::Fingerprint => false,
+            | HeirSubcmd::Fingerprint
+            | HeirSubcmd::RemoveMnemonic { .. } => false,
         };
 
         let heir = match &mut self {
@@ -247,7 +256,7 @@ impl super::CommandExecutor for HeirSubcmd {
                         ))
                         .await?
                         {
-                            return Ok(Box::new("Delete heir-wallet cancelled"));
+                            return Ok(Box::new("Delete heir cancelled"));
                         }
                     }
                     if !ask_user_confirmation(&format!(
@@ -256,11 +265,31 @@ impl super::CommandExecutor for HeirSubcmd {
                     ))
                     .await?
                     {
-                        return Ok(Box::new("Delete heir-wallet cancelled"));
+                        return Ok(Box::new("Delete heir cancelled"));
                     }
                 }
                 heir.delete(&mut db)?;
                 Box::new("Heir deleted")
+            }
+            HeirSubcmd::RemoveMnemonic {
+                i_understand_what_i_am_doing,
+            } => {
+                if !i_understand_what_i_am_doing {
+                    if !heir.key_provider().is_none() {
+                        if !ask_user_confirmation(&format!(
+                            "Do you have a backup of the seed of the heir \"{}\"?",
+                            heir.name()
+                        ))
+                        .await?
+                        {
+                            return Ok(Box::new("Delete heir mnemonic seed cancelled"));
+                        }
+                    }
+                }
+                let mut heir = heir;
+                heir.strip_key_provider();
+                heir.save(&mut db)?;
+                Box::new("Heir mnemonic seed deleted")
             }
             HeirSubcmd::Export {
                 email,
