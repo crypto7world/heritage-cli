@@ -311,7 +311,8 @@ impl super::CommandExecutor for WalletSubcmd {
             WalletSubcmd::LedgerPolicies { subcmd } => match subcmd {
                 WalletLedgerPolicySubcmd::List | WalletLedgerPolicySubcmd::AutoRegister => true,
                 WalletLedgerPolicySubcmd::ListRegistered
-                | WalletLedgerPolicySubcmd::Register { .. } => false,
+                | WalletLedgerPolicySubcmd::Register { .. }
+                | WalletLedgerPolicySubcmd::ClearRegistered => false,
             },
             WalletSubcmd::AccountXpubs { subcmd } => match subcmd {
                 WalletAXpubSubcmd::AutoAdd { .. }
@@ -334,7 +335,9 @@ impl super::CommandExecutor for WalletSubcmd {
             WalletSubcmd::LedgerPolicies { subcmd } => match subcmd {
                 WalletLedgerPolicySubcmd::AutoRegister
                 | WalletLedgerPolicySubcmd::Register { .. } => true,
-                WalletLedgerPolicySubcmd::ListRegistered | WalletLedgerPolicySubcmd::List => false,
+                WalletLedgerPolicySubcmd::ListRegistered
+                | WalletLedgerPolicySubcmd::List
+                | WalletLedgerPolicySubcmd::ClearRegistered => false,
             },
             WalletSubcmd::AccountXpubs { subcmd } => match subcmd {
                 WalletAXpubSubcmd::Generate { .. } | WalletAXpubSubcmd::AutoAdd { .. } => true,

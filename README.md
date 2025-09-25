@@ -135,7 +135,7 @@ You can find precompiled binaries for the major platforms in the Release section
 If you wish to install the `v0.6.0-beta` for Linux, you can run:
 
 ```shell
-version="v0.6.0-beta"
+version="v0.7.1-beta"
 wget https://github.com/crypto7world/heritage-cli/releases/download/${version}/heritage-cli-${version}-x86_64-unknown-linux-gnu.tar.gz
 tar xvzf heritage-cli-${version}-x86_64-unknown-linux-gnu.tar.gz
 ./heritage-cli # to verify it worked, should display usage instructions
@@ -190,10 +190,10 @@ heritage-cli help wallet create
 ```text
 Creates a new Heritage wallet with the chosen online-wallet and key-provider
 
-An Heritage wallet has two functional components: 
-  - The "key-provider" is the component dedicated to key management. 
-    It will be use mainly when creating a new wallet and each time you need to sign a Bitcoin transaction. 
-    Its security is critical and using a Ledger device is recommended. 
+An Heritage wallet has two functional components:
+  - The "key-provider" is the component dedicated to key management.
+    It will be use mainly when creating a new wallet and each time you need to sign a Bitcoin transaction.
+    Its security is critical and using a Ledger device is recommended.
   - The "online-wallet" is the component on which you can declare your Heritage Configuration, generate new Bitcoin addresses, synchronize with the blockchain and create new Unsigned transactions.
 
 Usage: heritage-cli wallet create [OPTIONS]

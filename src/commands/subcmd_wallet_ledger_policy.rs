@@ -23,6 +23,8 @@ pub enum WalletLedgerPolicySubcmd {
     },
     /// Retrieve Ledger policies using the Online component of the wallet and register them to the Offline component
     AutoRegister,
+    /// Clear the Ledger policies of the wallet that are already registered in the Ledger
+    ClearRegistered,
 }
 
 impl super::CommandExecutor for WalletLedgerPolicySubcmd {
@@ -111,6 +113,19 @@ impl super::CommandExecutor for WalletLedgerPolicySubcmd {
                 };
                 wallet.save(&mut db)?;
                 Box::new(format!("{count} new policies registered"))
+            }
+            WalletLedgerPolicySubcmd::ClearRegistered => {
+                let count = if let btc_heritage_wallet::AnyKeyProvider::Ledger(ledger_wallet) =
+                    wallet.key_provider_mut()
+                {
+                    ledger_wallet.clear_registered_policies()
+                } else {
+                    return Err(btc_heritage_wallet::errors::Error::IncorrectKeyProvider(
+                        "Ledger",
+                    ));
+                };
+                wallet.save(&mut db)?;
+                Box::new(format!("{count} policies cleared"))
             }
         };
         Ok(res)
