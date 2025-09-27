@@ -1,6 +1,6 @@
 [package]
 name = "heritage-cli"
-version = "0.7.1-beta"
+version = "0.8.0-beta"
 description = "The Heritage wallet CLI, a Bitcoin Taproot wallet managing on-chain inheritance of bitcoins"
 repository = "https://github.com/crypto7world/heritage-cli.git"
 rust-version = "1.81"
@@ -12,7 +12,7 @@ license = "MIT"
 
 [dependencies]
 # btc-heritage-wallet = { path = "../btc-heritage/crates/btc-heritage-wallet" }
-btc-heritage-wallet = { git = "https://github.com/crypto7world/btc-heritage.git", tag = "v0.28.2" }
+btc-heritage-wallet = { git = "https://github.com/crypto7world/btc-heritage.git", tag = "v0.29.0" }
 clap = { version = "4.5", features = ["derive", "env"] }
 
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
