@@ -28,7 +28,7 @@
   <p align="center">
     The Heritage wallet CLI, a Bitcoin Taproot wallet managing on-chain inheritance of bitcoins.
     <br />
-    <a href="https://btcherit.com"><strong>Explore the Heritage wallet service »</strong></a>
+    <a href="https://btc-heritage.com"><strong>Explore the Heritage wallet service »</strong></a>
     <br />
     <a href="https://github.com/crypto7world/heritage-cli/issues">Report Bug</a>
   </p>
@@ -74,27 +74,27 @@
 
 The [`heritage-cli`] project provides a CLI tool to manages Bitcoin wallets.
 
-It can interact with the [btcherit.com][heritage-wallet-service] service or manage everything locally. On the private keys front, it can either manage them localy, or with the help of a [Ledger](https://www.ledger.com/) hardware-wallet device.
+It can interact with the [btc-heritage.com][heritage-wallet-service] service or manage everything locally. On the private keys front, it can either manage them localy, or with the help of a [Ledger](https://www.ledger.com/) hardware-wallet device.
 
-Here is the basic workflow between the **Bitcoin blockchain**, the [btcherit.com][heritage-wallet-service] service and the [`heritage-cli`]:
+Here is the basic workflow between the **Bitcoin blockchain**, the [btc-heritage.com][heritage-wallet-service] service and the [`heritage-cli`]:
 
 <div align="center">
     <img src="images/interaction-with-service.png" alt="Workflow">
     <p><i>This PNG can be edited using <a href="https://draw.io">Draw.io</a></i></p>
 </div>
 
-1. The [btcherit.com][heritage-wallet-service] service synchronize permanently with the Bitcoin blockchain;
+1. The [btc-heritage.com][heritage-wallet-service] service synchronize permanently with the Bitcoin blockchain;
 2. From the service, you can see and manage your wallet, and create new _unsigned transactions_;
 3. The [`heritage-cli`] sign those transactions using your private key(s), preferably managed on a [Ledger](https://www.ledger.com/) device;
 4. From the service, you can broadcast the _signed transactions_.
 
 If you don't have a [Ledger](https://www.ledger.com/) device, installing the [`heritage-cli`] on an air-gapped computer will give you a very secure setup because your private keys never need to "touch" the Internet, but on the other-hand making transactions is burdensome because you need to transfer them in and out of the air-gapped computer to sign them then broadcast them.
 
-Another advantage of this setup is that you only have to verify/trust the [`heritage-cli`]: the [btcherit.com][heritage-wallet-service] service does not know your private keys and cannot steal your coin!
+Another advantage of this setup is that you only have to verify/trust the [`heritage-cli`]: the [btc-heritage.com][heritage-wallet-service] service does not know your private keys and cannot steal your coin!
 
 ### Yeah, but I don't want to depend on an online service at all
 
-And I understand: the CLI is able to work independently of the service! Provide it a custom Bitcoin Core or Electrum node for synchronization, and manage your Heritage wallet entirely on your own!
+And we understand: the CLI is able to work independently of the service! Provide it a custom Bitcoin Core or Electrum node for synchronization, and manage your Heritage wallet entirely on your own!
 
 Beware though that you _SHOULD_ make sure you understand what are the caveat of this mode of operation, most importantly that you _HAVE TO_ backup your descriptors: it is even more important than to backup you seed.
 
@@ -204,7 +204,7 @@ Options:
 
 ### Login to the service
 
-Assuming you use the [btcherit.com][heritage-wallet-service] service as the online-wallet, the CLI will need to be authenticated.
+Assuming you use the [btc-heritage.com][heritage-wallet-service] service as the online-wallet, the CLI will need to be authenticated.
 
 ```shell
 heritage-cli service login
@@ -218,7 +218,7 @@ It is not per-say a _mandatory_ step, but it will make your life **MUCH** easier
 
 _**Note:** If you are on Linux, you need to install UDEV rules in order for your Ledger device to be found, go to the official Ledger repository: [https://github.com/LedgerHQ/udev-rules](https://github.com/LedgerHQ/udev-rules)_
 
-Create a new wallet named _default_ that will use the [btcherit.com][heritage-wallet-service] service as `online-wallet` and a Ledger as `key-provider` by simply running:
+Create a new wallet named _default_ that will use the [btc-heritage.com][heritage-wallet-service] service as `online-wallet` and a Ledger as `key-provider` by simply running:
 
 ```shell
 heritage-cli wallet create
@@ -288,7 +288,7 @@ The Heritage wallet architecture makes it rely mostly on its internal database, 
 heritage-cli wallet sync
 ```
 
-If you are _NOT USING_ the [btcherit.com][heritage-wallet-service] service, the CLI will attempt to connect to a local Bitcoin Core node by default. You can change this behavior, for example to use a local Electrum node:
+If you are _NOT USING_ the [btc-heritage.com][heritage-wallet-service] service, the CLI will attempt to connect to a local Bitcoin Core node by default. You can change this behavior, for example to use a local Electrum node:
 
 ```shell
 heritage-cli blockchain --set --electrum-uri tcp://localhost:50001
@@ -352,7 +352,7 @@ Distributed under the MIT License. See [`LICENSE`][license-url] for more informa
 
 [![Rust][rust-shield]][rust-url]
 
-And based upon 3 Rust projects without which I would not have gotten that far:
+And based upon 3 Rust projects without which we would not have gotten that far:
 
 - [`bdk`]
 - [`rust-miniscript`]
@@ -389,7 +389,7 @@ Project Link: [https://github.com/crypto7world/heritage-cli][repo-url]
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
-[heritage-wallet-service]: https://btcherit.com
+[heritage-wallet-service]: https://btc-heritage.com
 [repo-url]: https://github.com/crypto7world/heritage-cli
 [`heritage-cli`]: https://github.com/crypto7world/heritage-cli
 [contributors-shield]: https://img.shields.io/github/contributors/crypto7world/heritage-cli.svg?style=for-the-badge
