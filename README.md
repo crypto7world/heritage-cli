@@ -59,7 +59,7 @@
         <li><a href="#spending-coins">Spending coins</a></li>
       </ul>
     </li>
-    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#hardware-wallet-support">Hardware Wallet Support</a></li>
     <li><a href="#minimum-supported-rust-version-msrv">Minimum Supported Rust Version (MSRV)</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#built-with">Built With</a></li>
@@ -329,6 +329,12 @@ heritage-cli wallet broadcast $signed
 ```
 
 <p align="right">(<a href="#top">back to top</a>)</p>
+
+## Hardware Wallet Support
+
+Heritage GUI supports hardware wallets for secure private key management. See [Hardware Wallet Support](https://github.com/crypto7world/btc-heritage?tab=readme-ov-file#hardware-wallet-support).
+
+<p align="right">(<a href="#top">↑ back to top</a>)</p>
 
 <!-- MSRV -->
 
