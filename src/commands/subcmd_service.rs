@@ -2,7 +2,7 @@ use core::any::Any;
 
 use btc_heritage_wallet::{
     errors::Result,
-    heritage_service_api_client::{HeritageServiceClient, HeritageServiceConfig},
+    heritage_service_api_client::{HeritageServiceClient, HeritageServiceConfig, TokenCache},
     Database, DatabaseSingleItem,
 };
 
@@ -89,7 +89,11 @@ impl super::CommandExecutor for ServiceSubcmd {
                 service_client.persist_tokens_in_cache(&mut db).await?;
                 Box::new("Login successful")
             }
-            ServiceSubcmd::Logout => todo!(),
+            ServiceSubcmd::Logout => {
+                TokenCache::clear(&mut db).await?;
+                service_client.logout().await?;
+                Box::new("Logout successful")
+            }
             ServiceSubcmd::ListWallets => service_client.list_wallets().await.map(Box::new)?,
             ServiceSubcmd::Wallet { wallet_id, subcmd } => {
                 let params = Box::new((wallet_id, service_client));
